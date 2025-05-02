@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "twitter-api-v2": "npm:twitter-api-v2@1.16.0",
+    "tencentcloud-sdk-nodejs-ccc": "npm:tencentcloud-sdk-nodejs-ccc@4.0.814"
+  }
+}
