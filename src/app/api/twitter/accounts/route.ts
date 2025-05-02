@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server';
  * API Route: 获取监控账号列表
  * @route GET /api/twitter/accounts
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: NextRequest) {
   console.log('[API Get Accounts] Received request');
 
