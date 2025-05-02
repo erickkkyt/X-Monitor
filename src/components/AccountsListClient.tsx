@@ -88,9 +88,10 @@ export default function AccountsListClient({ initialAccounts }: AccountsListClie
       setAccounts(prevAccounts => prevAccounts.filter(account => account.id !== id));
       console.log(`[Client] Successfully removed account ID: ${id} from local state.`);
 
-    } catch (err: Error) {
+    } catch (err: unknown) {
       console.error('[Client] Error deleting account:', err);
-      setError(err.message || '删除账号时出错');
+      const message = err instanceof Error ? err.message : '删除账号时出错';
+      setError(message);
     } finally {
       setDeletingId(null);
     }
