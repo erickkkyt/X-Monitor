@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import DashboardHeader from '@/components/DashboardHeader';
 
@@ -47,7 +47,7 @@ export default function NotificationsPage() {
   const supabase = createClient();
   
   // 验证电话号码格式
-  const validatePhoneNumber = (number) => {
+  const validatePhoneNumber = (number: string) => {
     if (!number.trim() && !phoneEnabled) return true; // 如果未启用电话通知，则不验证
     
     // 根据国家代码验证格式
@@ -67,7 +67,7 @@ export default function NotificationsPage() {
   };
   
   // 更新完整电话号码（带国家代码）
-  const updateFullPhoneNumber = (code, number) => {
+  const updateFullPhoneNumber = (code: string, number: string) => {
     const cleanNumber = number.replace(/\D/g, '');
     if (cleanNumber) {
       setPhoneNumber(`${code}${cleanNumber}`);
@@ -77,7 +77,7 @@ export default function NotificationsPage() {
   };
   
   // 处理国家代码变更
-  const handleCountryCodeChange = (e) => {
+  const handleCountryCodeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newCode = e.target.value;
     setCountryCode(newCode);
     updateFullPhoneNumber(newCode, phoneNumberValue);
@@ -93,7 +93,7 @@ export default function NotificationsPage() {
   };
   
   // 处理电话号码输入
-  const handlePhoneNumberChange = (e) => {
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setPhoneNumberValue(newValue);
     updateFullPhoneNumber(countryCode, newValue);
@@ -204,7 +204,7 @@ export default function NotificationsPage() {
     }
   };
   
-  const handleRemoveKeyword = (keyword) => {
+  const handleRemoveKeyword = (keyword: string) => {
     setKeywordAlerts(keywordAlerts.filter(k => k !== keyword));
   };
 
