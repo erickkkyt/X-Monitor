@@ -48,7 +48,7 @@ export default async function Dashboard() {
       throw error;
     }
     accounts = data || [];
-  } catch (error: Error) {
+  } catch (error: unknown) {
     console.error('Error fetching monitored accounts:', error);
     // Check if error has a message property before accessing it
     fetchError = '无法加载监控账号列表: ' + (error instanceof Error ? error.message : '未知错误');
