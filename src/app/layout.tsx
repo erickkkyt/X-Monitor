@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Twitter Monitor - AI驱动的推特动态监控系统",
+  title: "X-Monitor - AI驱动的推特动态监控系统",
   description: "实时监控重要推特账号，智能过滤内容，多渠道通知，让您不错过任何重要动态。",
 };
 
