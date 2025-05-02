@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
 import { createClient } from '@/utils/supabase/client';
+import { type User } from '@supabase/supabase-js'; // Ensure User type is imported
 
 // Define plan structure (can be expanded)
 interface PlanFeature {
@@ -17,7 +18,7 @@ interface PlanFeature {
 
 // 定义一个简化版Header，仅用于定价页
 function PricingHeader() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
