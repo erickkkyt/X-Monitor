@@ -66,8 +66,13 @@ export async function POST(req: NextRequest) {
       // Return the message from the result, defaulting if needed
       return NextResponse.json({ success: false, message: errorMessage || '添加账号失败' }, { status: statusCode });
     }
-  } catch (error: Error) {
+  } catch (error: unknown) {
     console.error('[API Add Account] Unexpected error calling addMonitoredAccount:', error);
-    return NextResponse.json({ success: false, message: '服务器内部错误: ' + error.message }, { status: 500 });
+    // Add type guard before accessing error.message
+    let message = '服务器内部错误';
+    if (error instanceof Error) {
+      message = '服务器内部错误: ' + error.message;
+    }
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 } 
