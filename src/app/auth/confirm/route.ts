@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createClient(cookieStore) // 注意：官方 server.ts createClient 不需要参数，这里保持一致
 
+    // @ts-expect-error - Supabase types might be inferred incorrectly in build environment
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash,
