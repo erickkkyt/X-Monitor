@@ -1,8 +1,15 @@
 import Link from 'next/link';
 import { login, signup } from './actions'; // 导入 Server Actions
 
-// Revert to simple functional component with inline prop types
-export default function LoginPage({ searchParams }: { searchParams?: { message?: string } }) {
+// Apply fix based on params/searchParams being a Promise in Next.js 15 generated types
+export default async function LoginPage({ 
+  searchParams 
+}: { 
+  searchParams?: Promise<{ message?: string }> 
+}) {
+  // Await the promise to get the actual searchParams object
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -13,9 +20,9 @@ export default function LoginPage({ searchParams }: { searchParams?: { message?:
         </div>
 
         {/* 显示来自 Server Action 重定向的消息 */}
-        {searchParams?.message && (
+        {resolvedSearchParams?.message && (
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-md text-center text-sm text-blue-700 mb-6">
-            {searchParams.message}
+            {resolvedSearchParams.message}
           </div>
         )}
 
