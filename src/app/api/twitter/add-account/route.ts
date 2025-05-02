@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   console.log('[API Add Account] Received request');
 
   // 1. Create Supabase client using the server utility function
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // 2. Get user session
   const {
