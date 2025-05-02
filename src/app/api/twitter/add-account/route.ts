@@ -51,16 +51,20 @@ export async function POST(req: NextRequest) {
         account: result.account, // Return the full account object
       }, { status: 201 });
     } else {
-      // Determine appropriate status code based on error type
+      // Determine appropriate status code based on the result.message
       let statusCode = 500;
-      if (result.error === 'Account already monitored.') {
+      // Check if message exists and is a string before comparing/including
+      const errorMessage = typeof result.message === 'string' ? result.message : '';
+
+      if (errorMessage === 'Account already monitored.') {
         statusCode = 409; // Conflict
-      } else if (result.error?.includes('not found')) {
+      } else if (errorMessage.includes('not found')) {
           statusCode = 404; // Not Found
-      } else if (result.error?.includes('rate limit')) {
+      } else if (errorMessage.includes('rate limit')) {
           statusCode = 429; // Too Many Requests
       }
-      return NextResponse.json({ success: false, message: result.error || '添加账号失败' }, { status: statusCode });
+      // Return the message from the result, defaulting if needed
+      return NextResponse.json({ success: false, message: errorMessage || '添加账号失败' }, { status: statusCode });
     }
   } catch (error: Error) {
     console.error('[API Add Account] Unexpected error calling addMonitoredAccount:', error);
