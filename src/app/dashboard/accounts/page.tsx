@@ -19,7 +19,7 @@ interface MonitoredAccount {
 }
 
 export default async function AccountsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Get user session
   const {
