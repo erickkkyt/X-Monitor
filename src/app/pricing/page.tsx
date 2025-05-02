@@ -1,9 +1,9 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Header from '@/components/Header'; // Assuming Header is reusable
-import Footer from '@/components/Footer'; // Assuming Footer is reusable
+import Footer from '@/components/Footer';
 import { createClient } from '@/utils/supabase/client';
 
 // Define plan structure (can be expanded)

@@ -1,4 +1,4 @@
-import { apiClient, withRetry } from './client';
+import { withRetry } from './client'; // apiClient is implicitly used within withRetry
 import axios, { AxiosError } from 'axios'; // Import axios itself for isAxiosError check
 
 // Define expected shape of the user data from Twitter API v2
@@ -62,14 +62,14 @@ export async function fetchTwitterUserByUsername(username: string): Promise<Twit
         // Construct a more informative error message
         let errorMessage = `Twitter API Axios 错误 (${status || 'N/A'}) 获取 @${username} 时发生`;
         try {
-          const errorData = axiosError.response?.data as any;
-          if (errorData?.title) {
+          const errorData = axiosError.response?.data as Record<string, unknown>;
+          if (errorData?.title && typeof errorData.title === 'string') {
             errorMessage += `: ${errorData.title}`;
           }
-          if (errorData?.detail) {
+          if (errorData?.detail && typeof errorData.detail === 'string') {
             errorMessage += ` - ${errorData.detail}`;
           }
-        } catch (parseError) { /* Ignore */ }
+        } catch (_parseError) { /* Ignore parsing error */ }
         
         throw new Error(errorMessage);
       }

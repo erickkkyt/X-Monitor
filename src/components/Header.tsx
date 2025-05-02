@@ -1,8 +1,8 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client'; // 导入浏览器客户端
 import { type User } from '@supabase/supabase-js'; // 导入 Supabase User 类型
 

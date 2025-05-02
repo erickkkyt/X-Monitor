@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link'; // Keep link if needed for static links
+// Removed unused Link import: import Link from 'next/link'; 
 // Removed useState, useEffect, useAuth, useRouter
 
 import { createClient } from '@/utils/supabase/server'; // Import server client
@@ -48,9 +48,10 @@ export default async function Dashboard() {
       throw error;
     }
     accounts = data || [];
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error('Error fetching monitored accounts:', error);
-    fetchError = '无法加载监控账号列表: ' + error.message;
+    // Check if error has a message property before accessing it
+    fetchError = '无法加载监控账号列表: ' + (error instanceof Error ? error.message : '未知错误');
     // Decide how to handle this - maybe show an error message in the UI
     // For now, we'll pass the error state down
   }

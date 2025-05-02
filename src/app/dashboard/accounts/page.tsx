@@ -46,9 +46,9 @@ export default async function AccountsPage() {
       throw error;
     }
     accounts = data || [];
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error('Error fetching monitored accounts for accounts page:', error);
-    fetchError = '无法加载监控账号列表: ' + error.message;
+    fetchError = '无法加载监控账号列表: ' + (error instanceof Error ? error.message : '未知错误');
   }
 
   return (

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import DashboardHeader from '@/components/DashboardHeader';
+import NotificationSettings from '@/components/NotificationSettings'; // Assuming this component exists
 
 // 定义国家代码列表
 const countryCodes = [

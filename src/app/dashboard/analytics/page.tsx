@@ -1,7 +1,7 @@
 'use client';
 
+import React from 'react';
 import { useState } from 'react';
-import Link from 'next/link';
 import DashboardHeader from '@/components/DashboardHeader';
 
 export default function AnalyticsPage() {

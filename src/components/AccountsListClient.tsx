@@ -76,7 +76,7 @@ export default function AccountsListClient({ initialAccounts }: AccountsListClie
         try {
           const errorData = await response.json();
           errorMsg = errorData.message || errorMsg;
-        } catch (e) { /* Ignore */ }
+        } catch (_e) { /* Ignore parsing error */ }
         throw new Error(errorMsg);
       }
       
@@ -88,21 +88,12 @@ export default function AccountsListClient({ initialAccounts }: AccountsListClie
       setAccounts(prevAccounts => prevAccounts.filter(account => account.id !== id));
       console.log(`[Client] Successfully removed account ID: ${id} from local state.`);
 
-    } catch (err: any) {
+    } catch (err: Error) {
       console.error('[Client] Error deleting account:', err);
       setError(err.message || '删除账号时出错');
     } finally {
       setDeletingId(null);
     }
-  };
-
-  // Placeholder for toggling status (if needed)
-  const handleToggleStatus = (id: string) => {
-    console.log(`Toggle status for account ${id}`);
-    // TODO: Implement status toggling logic (API call + state update)
-    // setAccounts(accounts.map(account =>
-    //   account.id === id ? {...account, isActive: !account.isActive} : account
-    // ));
   };
 
   return (

@@ -54,8 +54,9 @@ export async function POST(request: Request) {
     // 5. Return success response
     return NextResponse.json({ success: true, message: '账号已成功删除' });
 
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error(`[API] Overall error during deletion for account ${accountId}:`, error);
-    return NextResponse.json({ success: false, message: error.message || '服务器内部错误' }, { status: 500 });
+    const message = error instanceof Error ? error.message : '服务器内部错误';
+    return NextResponse.json({ success: false, message: message }, { status: 500 });
   }
 } 

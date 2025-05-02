@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ success: false, message: result.error || '添加账号失败' }, { status: statusCode });
     }
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error('[API Add Account] Unexpected error calling addMonitoredAccount:', error);
     return NextResponse.json({ success: false, message: '服务器内部错误: ' + error.message }, { status: 500 });
   }
