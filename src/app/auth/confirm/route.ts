@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
   if (token_hash && type) {
     const supabase = createClient()
 
-    // @ts-expect-error - Supabase types might be inferred incorrectly in build environment
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash,
