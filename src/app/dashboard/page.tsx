@@ -20,7 +20,7 @@ interface MonitoredAccount {
 }
 
 export default async function Dashboard() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
