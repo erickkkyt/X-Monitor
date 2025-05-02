@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest) {
   console.log('[API Get Accounts] Received request');
 
   // 1. Create Supabase client using the server utility function
-  const supabase = createClient();
+  const supabase = await createClient();
   let userId = 'unknown'; // 用于日志记录
 
   try {
