@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+// import Image from 'next/image'; // 不再需要 Image 组件
 
 export default function Hero() {
   return (
@@ -33,13 +34,13 @@ export default function Hero() {
                 <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>无需Twitter API密钥</span>
+                <span>无需X API密钥</span>
               </div>
               <div className="flex items-center space-x-2 mt-2">
                 <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>免费计划每月可监控5个账号</span>
+                <span>免费计划每月可监控3个账号</span>
               </div>
               <div className="flex items-center space-x-2 mt-2">
                 <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -49,43 +50,89 @@ export default function Hero() {
               </div>
             </div>
           </div>
-          <div className="lg:w-1/2">
+          <div className="lg:w-1/2 scale-110 origin-right">
             <div className="relative bg-white shadow-xl rounded-2xl p-2 border border-gray-200">
               <div className="relative bg-gray-50 rounded-xl overflow-hidden">
-                {/* 在实际项目中，这里可以替换为真实的应用截图 */}
-                <div className="w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden relative">
-                  <div className="absolute inset-0 flex flex-col p-6">
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white">
-                        T
+                {/* 控制台示意图仿真优化（无header，左右均分） */}
+                <div className="w-full aspect-[16/7] bg-gray-900 rounded-lg overflow-hidden relative flex flex-row p-6 gap-6">
+                  {/* 左侧监控账号 */}
+                  <div className="flex-1 bg-[#181c22] rounded-lg p-5 flex flex-col justify-start">
+                    <div className="text-white text-base font-bold mb-4">监控账号 (1)</div>
+                    <div className="flex items-center bg-[#23272f] rounded-lg p-4 mb-2 shadow-sm">
+                      {/* <Image src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-gray-700" /> */}
+                      {/* 移除图片占位 */}
+                      <div className="w-10 h-10 rounded-full bg-gray-700 flex-shrink-0 mr-3"></div> {/* 添加一个灰色占位符 */}
+                      <div className="flex-1">
+                        <div className="text-white font-semibold">kkkkeric</div>
+                        <div className="text-xs text-gray-400">@kkkkericAI</div>
                       </div>
-                      <div className="text-white">
-                        <div className="font-bold">TwitterMonitor</div>
-                        <div className="text-xs opacity-70">实时监控控制台</div>
-                      </div>
+                      <div className="text-xs text-gray-400">添加于: 2025/4/30</div>
                     </div>
-                    <div className="flex-1 grid grid-cols-2 gap-3">
-                      <div className="bg-white/10 rounded-lg p-3">
-                        <div className="text-xs text-white/70 mb-1">监控账号</div>
-                        <div className="text-white font-medium">23 个</div>
+                  </div>
+                  {/* 右侧今日通知 */}
+                  <div className="flex-1 bg-[#181c22] rounded-lg p-5 flex flex-col justify-start">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-white text-base font-bold">今日通知</div>
+                      <button className="text-xs text-red-400 hover:underline">清除全部</button>
+                    </div>
+                    <div className="space-y-4">
+                      {/* 示例推文1 */}
+                      <div className="bg-[#23272f] rounded-lg p-4 flex items-start shadow-sm">
+                        {/* <Image src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover border border-gray-700 mt-1" /> */}
+                        {/* 移除图片占位 */}
+                        <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mr-3 mt-1"></div> {/* 添加一个灰色占位符 */}
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-white font-semibold text-sm">kkkkeric</span>
+                            <span className="text-xs text-gray-400">@kkkkericAI</span>
+                          </div>
+                          <div className="text-gray-200 text-sm mt-1">5.2 testing 20.11</div>
+                          <div className="flex items-center mt-2 space-x-4">
+                            <span className="text-xs text-gray-500">2 小时前</span>
+                            <button className="text-xs text-blue-400 hover:underline">查看详情</button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="bg-white/10 rounded-lg p-3">
-                        <div className="text-xs text-white/70 mb-1">今日通知</div>
-                        <div className="text-white font-medium">47 条</div>
+                      {/* 示例推文2 */}
+                      <div className="bg-[#23272f] rounded-lg p-4 flex items-start shadow-sm">
+                        {/* <Image src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover border border-gray-700 mt-1" /> */}
+                        {/* 移除图片占位 */}
+                        <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mr-3 mt-1"></div> {/* 添加一个灰色占位符 */}
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-white font-semibold text-sm">kkkkeric</span>
+                            <span className="text-xs text-gray-400">@kkkkericAI</span>
+                          </div>
+                          <div className="text-gray-200 text-sm mt-1">5.2 retesting, 17.31</div>
+                          <div className="flex items-center mt-2 space-x-4">
+                            <span className="text-xs text-gray-500">4 小时前</span>
+                            <button className="text-xs text-blue-400 hover:underline">查看详情</button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="bg-white/10 rounded-lg p-3">
-                        <div className="text-xs text-white/70 mb-1">重要更新</div>
-                        <div className="text-white font-medium">5 条</div>
-                      </div>
-                      <div className="bg-white/10 rounded-lg p-3">
-                        <div className="text-xs text-white/70 mb-1">AI分析</div>
-                        <div className="text-white font-medium">启用</div>
+                      {/* 示例推文3 */}
+                      <div className="bg-[#23272f] rounded-lg p-4 flex items-start shadow-sm">
+                        {/* <Image src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover border border-gray-700 mt-1" /> */}
+                        {/* 移除图片占位 */}
+                        <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mr-3 mt-1"></div> {/* 添加一个灰色占位符 */}
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-white font-semibold text-sm">kkkkeric</span>
+                            <span className="text-xs text-gray-400">@kkkkericAI</span>
+                          </div>
+                          <div className="text-gray-200 text-sm mt-1">5.2 testing again ,16.57</div>
+                          <div className="flex items-center mt-2 space-x-4">
+                            <span className="text-xs text-gray-500">5 小时前</span>
+                            <button className="text-xs text-blue-400 hover:underline">查看详情</button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+                {/* 底部添加账号输入区保持不变 */}
                 <div className="p-4">
-                  <div className="h-16 flex items-center space-x-4">
+                  <div className="h-12 flex items-center space-x-4">
                     <div className="w-full">
                       <div className="bg-gray-200 h-10 rounded-full flex items-center px-4">
                         <span className="text-gray-500">添加推特账号...</span>

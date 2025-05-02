@@ -1,10 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/utils/supabase/client';
 
 export default function Pricing() {
   const [annual, setAnnual] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function checkLogin() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+    }
+    checkLogin();
+  }, [supabase]);
 
   const plans = [
     {
@@ -13,13 +24,13 @@ export default function Pricing() {
       monthlyPrice: '0',
       annualPrice: '0',
       features: [
-        '监控最多5个推特账号',
-        '邮件通知',
-        '基础过滤功能',
-        '每5分钟检查更新',
+        '监控最多2个推特账号',
+        '电话通知',
+        '每30分钟检查更新',
         '3天数据存储',
       ],
-      cta: '免费注册',
+      cta: '登录/注册',
+      ctaLink: '/login',
       highlight: false,
     },
     {
@@ -28,15 +39,15 @@ export default function Pricing() {
       monthlyPrice: '39',
       annualPrice: '29',
       features: [
-        '监控最多20个推特账号',
-        '邮件 + Telegram通知',
+        '监控最多5个推特账号',
+        '全渠道通知(电话/Telegram/Discord/Web)',
         'AI内容分析',
-        '每1分钟检查更新',
+        '每15分钟检查更新',
         '30天数据存储',
-        '数据导出功能',
         '通知规则设置',
       ],
-      cta: '开始试用',
+      cta: '升级计划',
+      ctaLink: '/pricing',
       highlight: true,
     },
     {
@@ -45,7 +56,7 @@ export default function Pricing() {
       monthlyPrice: '99',
       annualPrice: '79',
       features: [
-        '监控无限推特账号',
+        '监控最多20个推特账号',
         '全渠道通知(邮件/Telegram/Discord/Web)',
         '高级AI内容分析',
         '自定义检查频率',
@@ -54,7 +65,8 @@ export default function Pricing() {
         '优先技术支持',
         '自定义API集成',
       ],
-      cta: '联系我们',
+      cta: '升级计划',
+      ctaLink: '/pricing',
       highlight: false,
     },
   ];
@@ -123,16 +135,35 @@ export default function Pricing() {
                   ))}
                 </ul>
                 <div className="mt-8">
-                  <Link 
-                    href={plan.name === '免费版' ? '/signup' : (plan.name === '标准版' ? '/signup?plan=standard' : '/contact')} 
-                    className={`w-full inline-block text-center py-3 px-6 rounded-lg font-medium ${
-                      plan.highlight 
-                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                        : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
-                    } transition-colors`}
-                  >
-                    {plan.cta}
-                  </Link>
+                  {plan.name === '免费版' ? (
+                    <button
+                      onClick={() => {
+                        if (isLoggedIn) {
+                          window.location.href = '/dashboard';
+                        } else {
+                          window.location.href = '/login';
+                        }
+                      }}
+                      className={`w-full inline-block text-center py-3 px-6 rounded-lg font-medium ${
+                        plan.highlight 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                          : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
+                      } transition-colors`}
+                    >
+                      登录/注册
+                    </button>
+                  ) : (
+                    <Link 
+                      href={plan.ctaLink}
+                      className={`w-full inline-block text-center py-3 px-6 rounded-lg font-medium ${
+                        plan.highlight 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                          : 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50'
+                      } transition-colors`}
+                    >
+                      {plan.cta}
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

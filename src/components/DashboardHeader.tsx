@@ -54,15 +54,15 @@ export default function DashboardHeader() {
   };
 
   return (
-    <header className="bg-[#161b22] py-4 px-6 flex items-center justify-between border-b border-gray-800">
+    <header className="bg-[#161b22] py-4 px-6 flex items-center justify-between border-b border-gray-800 relative">
       <div className="flex items-center space-x-3">
         <Link href="/dashboard">
           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold cursor-pointer">
-            T
+            X
           </div>
         </Link>
         <div>
-          <h1 className="text-xl font-bold">TwitterMonitor</h1>
+          <h1 className="text-xl font-bold">X-Monitor</h1>
           <p className="text-sm text-gray-400">
             {activeTab === 'dashboard' && '控制台'}
             {activeTab === 'accounts' && '账号管理'}
@@ -71,7 +71,10 @@ export default function DashboardHeader() {
           </p>
         </div>
       </div>
-
+      {/* 绝对居中返回首页按钮 */}
+      <Link href="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 border border-blue-500 text-blue-500 rounded hover:bg-blue-500 hover:text-white transition-colors text-sm font-medium z-10">
+        返回首页
+      </Link>
       <nav className="flex items-center space-x-6">
         <Link 
           href="/dashboard" 

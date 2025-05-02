@@ -400,19 +400,48 @@ export default function NotificationsPage() {
           </div>
           
           <div className="bg-[#1c2128] rounded-lg p-6 shadow-lg">
+            {/* 紧凑型升级提示框 */}
+            <div className="mb-6 bg-[#182032] border border-blue-500 rounded-md p-4 shadow flex flex-col items-center">
+              <div className="flex items-center w-full justify-center mb-2">
+                <svg className="w-7 h-7 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-blue-100 text-sm">免费计划不支持更多的通知规则设置，请升级版本。</span>
+              </div>
+              <button className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-6 rounded-md text-base transition-colors duration-200 flex items-center justify-center mt-1" onClick={() => window.location.href = '/pricing'}>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                升级计划
+              </button>
+            </div>
+            
             <h3 className="text-xl font-semibold mb-4">通知规则</h3>
             
-            <div className="mb-6">
+            {/* 通知频率提前 */}
+            <div className="mb-6 opacity-75">
+              <p className="font-medium mb-2">通知频率</p>
+              <select className="bg-[#0d1117] border border-gray-700 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-not-allowed opacity-75" disabled>
+                <option>15分钟</option>
+                <option>10分钟</option>
+                <option>5分钟</option>
+                <option>1分钟</option>
+              </select>
+            </div>
+
+            {/* 免打扰时间后置 */}
+            <div className="mb-6 opacity-75">
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium">免打扰时间</p>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className="relative inline-flex items-center cursor-not-allowed">
                   <input 
                     type="checkbox" 
                     checked={quietHoursEnabled} 
                     onChange={() => setQuietHoursEnabled(!quietHoursEnabled)} 
                     className="sr-only peer"
+                    disabled
                   />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 opacity-60"></div>
                 </label>
               </div>
               <div className="flex space-x-4">
@@ -422,8 +451,8 @@ export default function NotificationsPage() {
                     type="time" 
                     value={quietHoursStart}
                     onChange={(e) => setQuietHoursStart(e.target.value)}
-                    className="bg-[#0d1117] border border-gray-700 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    disabled={!quietHoursEnabled}
+                    className="bg-[#0d1117] border border-gray-700 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-not-allowed"
+                    disabled
                   />
                 </div>
                 <div className="flex-1">
@@ -432,21 +461,11 @@ export default function NotificationsPage() {
                     type="time" 
                     value={quietHoursEnd}
                     onChange={(e) => setQuietHoursEnd(e.target.value)}
-                    className="bg-[#0d1117] border border-gray-700 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    disabled={!quietHoursEnabled}
+                    className="bg-[#0d1117] border border-gray-700 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-not-allowed"
+                    disabled
                   />
                 </div>
               </div>
-            </div>
-            
-            <div className="mb-6">
-              <p className="font-medium mb-2">通知频率</p>
-              <select className="bg-[#0d1117] border border-gray-700 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <option>实时通知</option>
-                <option>每小时汇总</option>
-                <option>每日汇总</option>
-                <option>仅重要更新</option>
-              </select>
             </div>
             
             <div>
@@ -457,22 +476,25 @@ export default function NotificationsPage() {
                   value={newKeyword}
                   onChange={(e) => setNewKeyword(e.target.value)}
                   placeholder="添加关键词..."
-                  className="flex-1 bg-[#0d1117] border border-gray-700 rounded-l px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="flex-1 bg-[#0d1117] border border-gray-700 rounded-l px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-not-allowed opacity-75"
+                  disabled
                 />
                 <button 
                   onClick={handleAddKeyword}
-                  className="bg-blue-600 text-white rounded-r px-4 py-2 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="bg-blue-600 text-white rounded-r px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 opacity-75 cursor-not-allowed"
+                  disabled
                 >
                   添加
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {keywordAlerts.map((keyword, index) => (
-                  <div key={index} className="flex items-center bg-[#0d1117] rounded-full px-3 py-1">
+                  <div key={index} className="flex items-center bg-[#0d1117] rounded-full px-3 py-1 opacity-75">
                     <span className="text-sm">{keyword}</span>
                     <button 
                       onClick={() => handleRemoveKeyword(keyword)}
-                      className="ml-2 text-gray-400 hover:text-white"
+                      className="ml-2 text-gray-400 cursor-not-allowed"
+                      disabled
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -490,18 +512,17 @@ export default function NotificationsPage() {
           <p className="text-gray-300 text-sm mb-4">
             启用电话通知后，当您监控的Twitter账号发布重要更新时，系统将自动拨打电话通知您，并语音朗读推文内容。
           </p>
-          <div className="bg-yellow-900 bg-opacity-20 border border-yellow-700 rounded-md p-4">
+          <div className="bg-[#23272f] bg-opacity-80 border border-yellow-600 rounded-md p-4">
             <div className="flex">
-              <svg className="w-6 h-6 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <h4 className="font-medium text-yellow-400">使用提示</h4>
-                <ul className="list-disc list-inside text-gray-300 text-sm mt-2 space-y-1">
+                <h4 className="font-medium text-yellow-300">使用提示</h4>
+                <ul className="list-disc list-inside text-yellow-100 text-sm mt-2 space-y-1">
                   <li>请确保输入的电话号码格式正确，以国际格式填写（如：+86 138xxxx xxxx）</li>
-                  <li>测试阶段，请确保在 Twilio 控制台中已验证您的电话号码</li>
                   <li>每次通知仅朗读最新的一条推文内容</li>
-                  <li>通知将遵循免打扰时间设置</li>
+                  <li>升级版本后，通知将遵循免打扰时间设置</li>
                 </ul>
               </div>
             </div>

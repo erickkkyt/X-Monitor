@@ -53,7 +53,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
-              <span className="text-xl font-bold text-blue-600 mr-2">TwitterMonitor</span>
+              <span className="text-xl font-bold text-blue-600 mr-2">X-Monitor</span>
               <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">AI</span>
             </Link>
           </div>
@@ -76,24 +76,30 @@ export default function Header() {
 
           {/* Call to Action Buttons / User Info */}
           <div className="hidden md:flex items-center space-x-4">
+            <Link 
+              href="/dashboard" 
+              className="px-4 py-1.5 border border-blue-600 text-blue-600 font-bold rounded-xl shadow-sm hover:bg-blue-600 hover:text-white transition-colors text-sm mr-24 ml-2 h-8 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              控制台
+            </Link>
             {loading ? (
               <div className="animate-pulse h-8 w-20 bg-gray-200 rounded-full"></div> // 加载占位符
             ) : user ? (
               // 用户已登录
               <div className="relative group">
-                 <div className="w-8 h-8 rounded-full bg-gray-700 cursor-pointer flex items-center justify-center text-white">
+                 <div className="w-8 h-8 rounded-full bg-gray-700 cursor-pointer flex items-center justify-center text-white border-2 border-white shadow-md">
                    {user.email?.charAt(0).toUpperCase()}
                  </div>
-                 <div className="absolute right-0 mt-2 bg-white border rounded-md shadow-lg py-1 w-48 hidden group-hover:block">
-                   <div className="px-4 py-2 text-sm text-gray-500 truncate border-b">
+                 <div className="absolute right-0 mt-2 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 w-56 hidden group-hover:block z-50">
+                   <div className="px-4 py-2 text-xs text-gray-400 truncate border-b border-gray-700 font-mono tracking-wide">
                      {user.email}
                    </div>
-                   <Link href="/dashboard" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                   <Link href="/dashboard" className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 hover:text-blue-400 transition-colors">
                      仪表盘
                     </Link>
                    <button
                      onClick={handleSignOut}
-                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                     className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-600 hover:text-white rounded-b-xl transition-colors"
                    >
                      退出登录
                    </button>

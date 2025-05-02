@@ -22,7 +22,7 @@ export default function Why() {
     },
     {
       title: '多渠道通知',
-      description: '支持邮件、Telegram等多种通知方式，确保您能在最合适的渠道及时接收到重要动态。',
+      description: '支持电话、Telegram、Discord等多种通知方式，确保您不错过任何重要更新。',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -30,8 +30,8 @@ export default function Why() {
       ),
     },
     {
-      title: '无需API密钥',
-      description: '我们的系统不需要您提供Twitter API密钥，简化了设置流程，同时保持强大的功能。',
+      title: '无需X API密钥',
+      description: '我们的系统不需要您提供X API密钥，简化了设置流程，同时保持强大的功能。',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // Re-define interfaces here or import from a shared types file
 interface MonitoredAccount {
@@ -43,6 +44,7 @@ interface DashboardClientProps {
 interface TweetData {
   tweet_id: string;
   content: string;
+  tweet_created_at?: string; // 接收来自后端的推文创建时间
   [key: string]: unknown; // 允许其他可能的字段
 }
 
@@ -53,8 +55,12 @@ interface PresenceData {
   leftPresences?: unknown[];
 }
 
-// 新增：本地存储通知的键名
-const NOTIFICATIONS_STORAGE_KEY = 'twitter_monitor_notifications';
+// 获取今天的起始时间 (00:00:00)
+const getStartOfToday = () => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+};
 
 export default function DashboardClient({ initialAccounts, initialFetchError }: DashboardClientProps) {
   // Client-side state
@@ -64,186 +70,202 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
   const [addAccountSuccess, setAddAccountSuccess] = useState<string | null>(null);
   const [monitoredAccounts, setMonitoredAccounts] = useState<MonitoredAccount[]>(initialAccounts);
   const [accountsError, setAccountsError] = useState<string | null>(initialFetchError); // Use initial error from server
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [allReceivedNotifications, setAllReceivedNotifications] = useState<Notification[]>([]); // 存储所有接收到的通知
+  const [isLoading, setIsLoading] = useState(false); // 初始不加载，等 Realtime 连接后再加载
   const supabase = createClient();
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const dailyClearTimerRef = useRef<NodeJS.Timeout | null>(null); // 用于存储每日清除定时器
 
-  // 从localStorage加载通知
+  // --- 每日自动清除通知逻辑 ---
   useEffect(() => {
-    // 只在客户端运行
-    if (typeof window !== 'undefined') {
-      try {
-        const storedNotifications = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-        if (storedNotifications) {
-          // 解析存储的通知并修复日期对象（JSON.parse不会自动将字符串转换为Date）
-          const parsedNotifications = JSON.parse(storedNotifications);
-          const notificationsWithDateObjects = parsedNotifications.map((notification: Notification & {timestamp: string}) => ({
-            ...notification,
-            timestamp: new Date(notification.timestamp)
-          }));
-          setNotifications(notificationsWithDateObjects);
-        }
-      } catch (error) {
-        console.error('从本地存储加载通知失败:', error);
-        // 如果加载失败，不影响使用，继续使用空数组
+    const scheduleDailyClear = () => {
+      // 清除旧的定时器（如果有）
+      if (dailyClearTimerRef.current) {
+        clearTimeout(dailyClearTimerRef.current);
       }
-    }
-  }, []);
 
-  // 当通知更新时保存到localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined' && notifications.length > 0) {
-      try {
-        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
-      } catch (error) {
-        console.error('保存通知到本地存储失败:', error);
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0); // 设置为明天凌晨 0 点
+
+      const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+
+      console.log(`定时器将在 ${timeUntilMidnight / 1000 / 60} 分钟后触发清空`);
+
+      dailyClearTimerRef.current = setTimeout(() => {
+        console.log('凌晨到达，清除昨日通知...');
+        setAllReceivedNotifications([]); // 清空所有通知
+        scheduleDailyClear(); // 重新安排下一次清空
+      }, timeUntilMidnight);
+    };
+
+    scheduleDailyClear();
+
+    // 组件卸载时清除定时器
+    return () => {
+      if (dailyClearTimerRef.current) {
+        clearTimeout(dailyClearTimerRef.current);
+        console.log('组件卸载，清除每日定时器');
       }
-    }
-  }, [notifications]);
+    };
+  }, []); // 空依赖数组，仅在挂载和卸载时运行
 
+  // --- Realtime 设置与通知处理 ---
   useEffect(() => {
-    // 获取当前登录用户
-    const fetchUserAndSetupRealtime = async () => {
+    const isCleanedUp = { current: false };
+
+    const setupRealtime = async () => {
+      if (isCleanedUp.current) return;
+      setIsLoading(true); // 开始加载状态
+
       try {
-        setIsLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
-        
         if (!user) {
           console.error('用户未登录，无法设置实时通知');
+          setAccountsError('用户未登录，请重新登录'); // 提供用户反馈
           setIsLoading(false);
           return;
         }
 
-        // 设置Supabase Realtime订阅
+        // 清理旧通道（如果存在且未关闭）
+        if (channelRef.current && channelRef.current.state !== 'closed') {
+          console.log('检测到旧通道，正在移除...');
+          await supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+          console.log('旧通道已移除。');
+        }
+
         const channelName = `new-tweets-notifications:${user.id}`;
-        console.log(`订阅Realtime通道: ${channelName}`);
-        
-        // 增强的通道配置
-        const channel = supabase.channel(channelName, {
-          config: {
-            broadcast: { self: true }, // 允许接收自己发送的广播
-            presence: { key: user.id }
-          }
-        })
-        .on('broadcast', { event: 'new_tweets' }, (payload) => {
-          console.log('收到新推文通知:', payload);
-          
+        console.log(`创建 Realtime 通道: ${channelName}`);
+        const newChannel = supabase.channel(channelName, {
+          config: { broadcast: { self: true }, presence: { key: user.id } }
+        });
+        channelRef.current = newChannel;
+
+        newChannel.on('broadcast', { event: 'new_tweets' }, (message) => {
+          if (isCleanedUp.current) return;
+          console.log('收到新推文通知:', message);
+
           try {
-            // 处理接收到的通知
-            const { account_username, tweets } = payload.payload;
-            
-            if (tweets && tweets.length > 0) {
-              // 为每条推文创建一个通知
-              const newNotifications = tweets.map((tweet: TweetData) => ({
-                id: `${tweet.tweet_id}`,
+            const { account_username, tweets } = message.payload;
+            if (tweets && Array.isArray(tweets) && tweets.length > 0) {
+              const newNotifications: Notification[] = tweets.map((tweet: TweetData) => ({
+                id: tweet.tweet_id,
                 accountUsername: account_username,
+                // 尝试从当前监控列表中获取显示名和头像
                 accountDisplayName: monitoredAccounts.find(a => a.username === account_username)?.display_name || account_username,
                 profileImageUrl: monitoredAccounts.find(a => a.username === account_username)?.profile_image_url,
                 content: tweet.content,
-                timestamp: new Date(),
-                isImportant: tweet.content.includes('#') || tweet.content.toLowerCase().includes('important')
+                // 优先使用推文的创建时间，否则使用当前时间
+                timestamp: tweet.tweet_created_at ? new Date(tweet.tweet_created_at) : new Date(),
+                isImportant: tweet.content?.includes('#') || tweet.content?.toLowerCase().includes('important')
               }));
-              
-              // 合并通知并保存，确保不重复（检查推文ID）
-              setNotifications(prevNotifications => {
-                // 过滤掉已存在的通知（避免重复）
-                const existingIds = prevNotifications.map(n => n.id);
-                const uniqueNewNotifications = newNotifications.filter(
-                  n => !existingIds.includes(n.id)
-                );
-                
-                // 添加日志以跟踪通知状态
-                console.log(`添加了 ${uniqueNewNotifications.length} 条新通知，现有 ${prevNotifications.length} 条通知`);
-                
-                return [...uniqueNewNotifications, ...prevNotifications];
+
+              setAllReceivedNotifications(prevNotifications => {
+                const combined = [...newNotifications, ...prevNotifications];
+                // 去重，确保 id 唯一
+                const uniqueNotifications = Array.from(new Map(combined.map(n => [n.id, n])).values());
+                return uniqueNotifications; // 存储所有去重后的通知
               });
             }
           } catch (error) {
-            // 捕获并记录处理通知时的错误
-            console.error('处理通知时出错:', error);
+            console.error('处理广播消息时出错:', error);
           }
-        })
-        // 增加更多事件处理
-        .on('system', ({ event }) => {
-          console.log(`Realtime系统事件: ${event}`);
-        })
-        .on('presence', { event: 'sync' }, () => {
-          console.log('Presence同步');
-        })
-        .on('presence', { event: 'join' }, (data: PresenceData) => {
+        });
+
+        newChannel.on('system', ({ event }) => {
+           if (isCleanedUp.current) return;
+           console.log(`Realtime 系统事件: ${event}`);
+        });
+        newChannel.on('presence', { event: 'sync' }, () => {
+           if (isCleanedUp.current) return;
+           console.log('Presence 同步');
+           // const presenceState = channelRef.current?.presenceState(); // Access via ref
+           // console.log('当前 Presence 状态:', presenceState);
+        });
+        newChannel.on('presence', { event: 'join' }, (data: PresenceData) => {
+           if (isCleanedUp.current) return;
           console.log(`用户加入: ${data.key}`, data.newPresences);
-        })
-        .on('presence', { event: 'leave' }, (data: PresenceData) => {
+        });
+        newChannel.on('presence', { event: 'leave' }, (data: PresenceData) => {
+           if (isCleanedUp.current) return;
           console.log(`用户离开: ${data.key}`, data.leftPresences);
         });
         
-        // 使用更健壮的订阅方式
-        let subscribeAttempts = 0;
-        const maxSubscribeAttempts = 3;
-        
-        const attemptSubscribe = () => {
-          try {
-            console.log(`尝试订阅 (${subscribeAttempts + 1}/${maxSubscribeAttempts + 1})`);
-            channel.subscribe((status) => {
-              console.log(`Realtime订阅状态: ${status}`);
-              
+        // Subscribe only ONCE per channel instance
+        newChannel.subscribe((status, err) => {
+          // Prevent processing if cleanup happened
+          if (isCleanedUp.current) return;
+
+          console.log(`Realtime 订阅状态: ${status}`);
               if (status === 'SUBSCRIBED') {
-                console.log('成功订阅Realtime通道');
+            console.log('成功订阅 Realtime 通道');
+            // Optionally track presence after successful subscription
+            // channelRef.current?.track({ online_at: new Date().toISOString() });
                 setIsLoading(false);
-              } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                console.error(`Realtime通道错误: ${status}`);
-                
-                if (subscribeAttempts < maxSubscribeAttempts) {
-                  subscribeAttempts++;
-                  const retryDelay = 2000 * subscribeAttempts;
-                  console.log(`将在 ${retryDelay}ms 后重试订阅 (${subscribeAttempts}/${maxSubscribeAttempts})`);
-                  
-                  setTimeout(() => {
-                    try {
-                      supabase.removeChannel(channel);
-                    } catch (error) {
-                      console.error('移除通道失败:', error);
-                    }
-                    attemptSubscribe();
-                  }, retryDelay);
-                } else {
-                  console.error(`达到最大重试次数 (${maxSubscribeAttempts})，不再重试`);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('Realtime 通道错误:', err);
                   setIsLoading(false);
-                }
-              }
-            });
-          } catch (error) {
-            console.error('订阅通道时出错:', error);
+            // Let Supabase client handle retries automatically
+          } else if (status === 'TIMED_OUT') {
+            console.warn('Realtime 订阅超时');
             setIsLoading(false);
+            // Let Supabase client handle retries automatically
+          } else if (status === 'CLOSED') {
+            console.log('Realtime 通道已关闭');
+            // Channel was closed, perhaps intentionally via cleanup or due to error.
+            // If unexpected, investigate why.
           }
-        };
-        
-        // 开始订阅尝试
-        attemptSubscribe();
-        
-        // 清理函数：组件卸载时取消订阅
-        return () => {
-          try {
-            console.log('清理Realtime订阅...');
-            supabase.removeChannel(channel);
-          } catch (error) {
-            console.error('移除通道时出错:', error);
-          }
-        };
+        });
+
       } catch (error) {
-        console.error('设置Realtime通知失败:', error);
+        console.error('设置 Realtime 通知失败:', error);
+        setAccountsError('无法设置通知服务');
         setIsLoading(false);
       }
     };
 
-    fetchUserAndSetupRealtime();
+    setupRealtime();
+
+    // Cleanup function
+    return () => {
+      isCleanedUp.current = true; // Mark as cleaned up
+      const currentChannel = channelRef.current; // Get channel from ref
+      if (currentChannel) {
+        console.log('清理 Realtime 订阅...');
+        supabase.removeChannel(currentChannel)
+          .then(() => console.log('通道已成功移除'))
+          .catch(err => console.error('移除通道时出错:', err));
+        channelRef.current = null; // Clear the ref
+      }
+    };
   }, [supabase, monitoredAccounts]);
+
+  // --- 计算用于展示的通知 ---
+  const latestThreeTodayNotifications = useMemo(() => {
+    const startOfToday = getStartOfToday();
+    return allReceivedNotifications
+      .filter(notification => notification.timestamp >= startOfToday) // 1. 筛选今天
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()) // 2. 按时间倒序
+      .slice(0, 3); // 3. 取最新的 3 条
+  }, [allReceivedNotifications]); // 当所有通知列表变化时重新计算
 
   const handleAddAccount = async () => {
     if (!newAccount.trim()) {
       setAddAccountError('请输入推特用户名。');
       return;
     }
+
+    // --- 新增：检查监控账号数量限制 ---
+    const MAX_ACCOUNTS_FREE_PLAN = 3;
+    if (monitoredAccounts.length >= MAX_ACCOUNTS_FREE_PLAN) {
+      setAddAccountError(`免费计划最多只能监控 ${MAX_ACCOUNTS_FREE_PLAN} 个账号。请升级套餐以监控更多账号。`);
+      // 可选：未来可以在这里添加跳转到升级页面的链接或按钮
+      setIsAddingAccount(false); // 确保重置加载状态
+      return; // 阻止继续执行添加逻辑
+    }
+    // --- 检查结束 ---
 
     const usernameToAdd = newAccount.trim();
     console.log(`[Client] Attempting to add account: ${usernameToAdd}`);
@@ -290,86 +312,68 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
   };
 
   // Helper function to format date/time
-  const formatTimeAgo = (isoString: string | null): string => {
-    if (!isoString) return '从未';
-    const date = new Date(isoString);
-    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + ' 年前';
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + ' 月前';
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + ' 天前';
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + ' 小时前';
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + ' 分钟前';
-    return Math.floor(seconds) + ' 秒前';
-  };
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  // 清除所有通知的函数
-  const clearAllNotifications = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(NOTIFICATIONS_STORAGE_KEY);
-      setNotifications([]);
-    }
+    let interval = Math.floor(seconds / 31536000);
+    if (interval > 1) return `${interval} 年前`;
+    interval = Math.floor(seconds / 2592000);
+    if (interval > 1) return `${interval} 个月前`;
+    interval = Math.floor(seconds / 86400);
+    if (interval > 1) return `${interval} 天前`;
+     // 今天的时间显示具体时分
+     if (date >= getStartOfToday()) {
+        return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+     }
+    interval = Math.floor(seconds / 3600);
+    if (interval > 1) return `${interval} 小时前`;
+    interval = Math.floor(seconds / 60);
+    if (interval > 1) return `${interval} 分钟前`;
+    return `${Math.floor(seconds)} 秒前`;
   };
-
-  // 移除筛选通知的逻辑
-  const filteredNotifications = notifications;
 
   return (
-    <>
+    <div className="min-h-screen bg-[#010409] text-gray-300 p-4 sm:p-6 lg:p-8">
       {/* 添加推特账号 Section */}
-      <div className="mb-6 bg-[#1c2128] rounded-lg p-4 shadow-lg">
-        <h2 className="text-lg font-semibold mb-3 text-gray-200">添加新的监控账号</h2>
-        {addAccountSuccess && <div className="mb-3 p-2 text-sm text-green-400 bg-green-900/50 border border-green-700 rounded-md">{addAccountSuccess}</div>}
-        {addAccountError && <div className="mb-3 p-2 text-sm text-red-400 bg-red-900/50 border border-red-700 rounded-md">{addAccountError}</div>}
-        <div className="flex items-center">
+      <div className="mb-8 p-6 bg-[#0d1117] rounded-lg shadow-md border border-gray-800">
+        <h2 className="text-xl font-semibold text-white mb-4">添加新的监控账号</h2>
+        <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
           <input
             type="text"
             value={newAccount}
-            onChange={(e) => {
-              setNewAccount(e.target.value);
-              if (addAccountError) setAddAccountError(null);
-              if (addAccountSuccess) setAddAccountSuccess(null);
-            }}
+            onChange={(e) => setNewAccount(e.target.value)}
             placeholder="输入推特用户名... (例如: elonmusk)"
-            className="flex-1 bg-[#0d1117] border border-gray-700 rounded-l-md py-2 px-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            className="flex-grow px-4 py-2 bg-[#161b22] border border-gray-700 rounded-md text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={isAddingAccount}
           />
           <button
             onClick={handleAddAccount}
-            className="bg-blue-600 text-white rounded-r-md px-5 py-2 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#1c2128] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center h-[42px]" // Match input height
-            disabled={isAddingAccount}
+            disabled={isAddingAccount || !newAccount.trim()}
+            className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#010409] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isAddingAccount ? (
-              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : (
-              '添加'
-            )}
+            {isAddingAccount ? '添加中...' : '添加'}
           </button>
         </div>
+        {addAccountError && <p className="mt-3 text-sm text-red-500">{addAccountError}</p>}
+        {addAccountSuccess && <p className="mt-3 text-sm text-green-500">{addAccountSuccess}</p>}
       </div>
 
       {/* 分为两列的布局：监控账号列表和今日通知 */}
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* 监控账号列表 Section - 宽度减半 */}
-        <div className="bg-[#1c2128] rounded-lg p-6 shadow-lg lg:w-1/2">
-          <h2 className="text-xl font-semibold mb-4">监控账号 ({monitoredAccounts.length})</h2>
-          {accountsError && <div className="mb-3 p-2 text-sm text-red-400 bg-red-900/50 border border-red-700 rounded-md">错误: {accountsError}</div>}
+        <div className="bg-[#0d1117] rounded-lg shadow-md p-6 border border-gray-800">
+          <h2 className="text-xl font-semibold text-white mb-5">监控账号 ({monitoredAccounts.length})</h2>
+          {accountsError && <p className="text-red-500 mb-4">{accountsError}</p>}
 
           {monitoredAccounts.length === 0 && !accountsError && (
-            <p className="text-center text-gray-500">您还没有添加任何监控账号。</p>
+            <p className="text-gray-500 italic">暂无监控账号，请在上方添加。</p>
           )}
 
           {monitoredAccounts.length > 0 && (
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2"> {/* Added max-height and scroll */}
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2"> {/* 添加滚动 */}
               {monitoredAccounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between p-3 bg-[#0d1117] rounded-md space-x-3 hover:bg-[#22272e] transition-colors duration-150">
+                <div key={account.id} className="flex items-center justify-between p-3 bg-[#161b22] rounded-md space-x-3 hover:bg-[#22272e] transition-colors duration-150">
                   <div className="flex items-center space-x-3 flex-shrink min-w-0"> {/* Added min-w-0 for truncation */}
                     {account.profile_image_url ? (
                       <Image
@@ -399,77 +403,69 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
         </div>
 
         {/* 今日通知 Section - 与监控账号列表宽度一致 */}
-        <div className="bg-[#1c2128] rounded-lg p-6 shadow-lg lg:w-1/2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">今日通知</h2>
-            {notifications.length > 0 && (
-              <button 
-                onClick={clearAllNotifications}
-                className="text-xs px-2 py-1 bg-red-600/20 text-red-400 rounded-md hover:bg-red-600/30"
-              >
-                清除全部
-              </button>
-            )}
+        <div className="bg-[#0d1117] rounded-lg shadow-md p-6 border border-gray-800">
+          <div className="flex justify-between items-center mb-5">
+            <h2 className="text-xl font-semibold text-white">今日通知</h2>
           </div>
           
           {/* 加载状态 */}
-          {isLoading && notifications.length === 0 && (
-            <div className="bg-[#0d1117] rounded-md p-8 text-center">
-              <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p className="text-gray-400">正在加载通知...</p>
-            </div>
-          )}
+          {isLoading && (
+             <div className="flex justify-center items-center h-40">
+               <p className="text-gray-500 italic">正在加载通知服务...</p>
+             </div>
+           )}
           
           {/* 无通知状态 */}
-          {!isLoading && filteredNotifications.length === 0 && (
-            <div className="bg-[#0d1117] rounded-md p-8 text-center">
-              <svg className="w-16 h-16 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          {!isLoading && accountsError && !accountsError.includes('无法设置通知服务') && !accountsError.includes('无法连接通知服务') && (
+             <div className="flex justify-center items-center h-40">
+               <p className="text-red-500 italic">{accountsError}</p>
+             </div>
+           )}
+          
+          {!isLoading && latestThreeTodayNotifications.length === 0 && !accountsError && (
+            <div className="flex flex-col items-center justify-center text-center text-gray-500 h-40">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              <p className="text-gray-400">今日暂无通知</p>
-              <p className="text-xs text-gray-500 mt-2">有新通知时将在此处显示</p>
+              <p>今日暂无通知</p>
+              <p className="text-xs mt-1">有新通知时将在此处显示</p>
             </div>
           )}
           
           {/* 通知列表 */}
-          {filteredNotifications.length > 0 && (
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {filteredNotifications.map((notification) => (
-                <div 
-                  key={notification.id} 
-                  className={`p-3 bg-[#0d1117] rounded-md border-l-4 ${notification.isImportant ? 'border-yellow-500' : 'border-blue-500'}`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center space-x-2">
-                      {notification.profileImageUrl ? (
-                        <Image
-                          src={notification.profileImageUrl}
-                          alt="Profile picture"
-                          width={24}
-                          height={24}
-                          className="rounded-full"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs font-medium">
-                          {notification.accountUsername.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <span className="font-medium text-white">{notification.accountDisplayName || notification.accountUsername}</span>
-                      <span className="text-xs text-gray-400">@{notification.accountUsername}</span>
+          {!isLoading && latestThreeTodayNotifications.length > 0 && (
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-2"> {/* 添加滚动 */}
+              {latestThreeTodayNotifications.map((notification) => (
+                <div key={notification.id} className="flex items-start p-4 bg-[#161b22] rounded-md space-x-3 shadow-sm hover:bg-[#22272e] transition-colors duration-150">
+                  {notification.profileImageUrl ? (
+                    <Image
+                      src={notification.profileImageUrl}
+                      alt={`${notification.accountUsername} profile picture`}
+                      width={32}
+                      height={32}
+                      className="rounded-full mt-1 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-medium mt-1 flex-shrink-0">
+                      {notification.accountUsername.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-xs text-gray-500">{formatTimeAgo(notification.timestamp.toISOString())}</span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                       <div className="flex items-baseline space-x-2">
+                         <span className="font-semibold text-white text-sm truncate">{notification.accountDisplayName || notification.accountUsername}</span>
+                         <span className="text-xs text-gray-400 truncate hidden sm:inline">@{notification.accountUsername}</span>
+                       </div>
+                       <span className="text-xs text-gray-500 flex-shrink-0 ml-2">{formatTimeAgo(notification.timestamp)}</span>
+                    </div>
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">{notification.content}</p>
                   </div>
-                  <p className="text-sm text-gray-300">{notification.content}</p>
-                  <div className="mt-2 text-xs text-blue-400 hover:underline cursor-pointer">查看详情</div>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 } 

@@ -4,7 +4,7 @@ export default function HowTo() {
   const steps = [
     {
       title: '创建账号',
-      description: '注册并创建您的个人账号，可使用Google、Twitter或GitHub账号直接登录，快速开始使用。',
+      description: '注册并创建您的个人账号，使用邮箱注册/登录，快速开始使用。',
       icon: (
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
