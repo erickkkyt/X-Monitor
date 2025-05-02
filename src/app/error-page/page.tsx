@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import { Metadata, NextPage } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -6,14 +6,14 @@ export const metadata: Metadata = {
   description: '处理请求时发生了错误'
 };
 
-// 使用标准的 Next.js 页面参数类型
-export default function ErrorPage({ 
-  searchParams 
-}: { 
-  searchParams: { [key: string]: string | string[] | undefined } 
-}) {
+// Define component props using NextPage utility type
+interface ErrorPageProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+const ErrorPage: NextPage<ErrorPageProps> = ({ searchParams }) => {
   // 安全地获取错误消息
-  const message = typeof searchParams.message === 'string' 
+  const message = typeof searchParams?.message === 'string' 
     ? searchParams.message 
     : '抱歉，处理您的请求时发生了意外错误。';
 
@@ -28,4 +28,6 @@ export default function ErrorPage({
       </Link>
     </div>
   );
-} 
+};
+
+export default ErrorPage; 
