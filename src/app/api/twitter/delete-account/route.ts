@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     if (!accountId) {
       throw new Error('accountId is required');
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, message: 'Invalid request body' }, { status: 400 });
   }
 

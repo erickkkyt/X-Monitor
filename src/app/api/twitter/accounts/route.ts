@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/server';
  * API Route: 获取监控账号列表
  * @route GET /api/twitter/accounts
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('[API Get Accounts] Received request');
 
   // 1. Create Supabase client using the server utility function

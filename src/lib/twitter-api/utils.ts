@@ -69,7 +69,7 @@ export async function fetchTwitterUserByUsername(username: string): Promise<Twit
           if (errorData?.detail && typeof errorData.detail === 'string') {
             errorMessage += ` - ${errorData.detail}`;
           }
-        } catch (_parseError) { /* Ignore parsing error */ }
+        } catch { /* Ignore parsing error, removed unused _parseError */ }
         
         throw new Error(errorMessage);
       }

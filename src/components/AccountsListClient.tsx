@@ -76,7 +76,7 @@ export default function AccountsListClient({ initialAccounts }: AccountsListClie
         try {
           const errorData = await response.json();
           errorMsg = errorData.message || errorMsg;
-        } catch (_e) { /* Ignore parsing error */ }
+        } catch { /* Ignore parsing error, removed unused _e */ }
         throw new Error(errorMsg);
       }
       

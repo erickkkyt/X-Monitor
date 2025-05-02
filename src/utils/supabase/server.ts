@@ -20,7 +20,7 @@ export const createClient = () => {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options })
-          } catch (_error) {
+          } catch {
             // 处理在 Server Components 中调用 set 可能引发的错误
             // 如果有刷新 session 的中间件，通常可以忽略
           }
@@ -28,7 +28,7 @@ export const createClient = () => {
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options })
-          } catch (_error) {
+          } catch {
             // 处理在 Server Components 中调用 remove 可能引发的错误
             // 如果有刷新 session 的中间件，通常可以忽略
           }
