@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { login, signup } from './actions'; // 导入 Server Actions
 
+// Revert to simple functional component with inline prop types
 export default function LoginPage({ searchParams }: { searchParams?: { message?: string } }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
