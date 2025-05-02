@@ -178,7 +178,7 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
            if (isCleanedUp.current) return;
            console.log(`Realtime 系统事件: ${event}`);
         });
-        newChannel.on('presence', { event: 'sync' }, () => {
+        newChannel.on('presence', { event: 'sync' }, (data: PresenceData) => {
            if (isCleanedUp.current) return;
            console.log('Presence 同步');
            // const presenceState = channelRef.current?.presenceState(); // Access via ref
