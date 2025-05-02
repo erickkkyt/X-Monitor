@@ -58,7 +58,7 @@ interface PresenceData {
 // 新增为 presence sync 事件定义的接口
 interface PresenceState {
   [key: string]: {
-    [id: string]: Record<string, any>;
+    [id: string]: Record<string, unknown>;
   }
 }
 
