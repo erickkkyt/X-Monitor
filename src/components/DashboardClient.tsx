@@ -194,7 +194,7 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
         });
         
         // Subscribe only ONCE per channel instance
-        newChannel.subscribe((status, err) => {
+        newChannel.subscribe((status, err, channel) => {
           // Prevent processing if cleanup happened
           if (isCleanedUp.current) return;
 
