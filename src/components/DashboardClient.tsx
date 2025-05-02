@@ -181,8 +181,11 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
           }
         });
 
-        newChannel.on('system', ({ event }) => {
+        // 修改回调函数签名，接收完整 payload
+        newChannel.on('system', {}, (payload) => { 
            if (isCleanedUp.current) return;
+           // 从 payload 中访问 event
+           const event = payload?.event; 
            console.log(`Realtime 系统事件: ${event}`);
         });
         
