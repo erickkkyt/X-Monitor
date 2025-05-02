@@ -1,6 +1,5 @@
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server' // 使用服务器端客户端
 
 export async function GET(request: NextRequest) {
@@ -10,8 +9,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (token_hash && type) {
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore) // 注意：官方 server.ts createClient 不需要参数，这里保持一致
+    const supabase = createClient()
 
     // @ts-expect-error - Supabase types might be inferred incorrectly in build environment
     const { error } = await supabase.auth.verifyOtp({
