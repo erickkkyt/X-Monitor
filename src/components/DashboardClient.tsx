@@ -55,6 +55,13 @@ interface PresenceData {
   leftPresences?: unknown[];
 }
 
+// 新增为 presence sync 事件定义的接口
+interface PresenceState {
+  [key: string]: {
+    [id: string]: Record<string, any>;
+  }
+}
+
 // 获取今天的起始时间 (00:00:00)
 const getStartOfToday = () => {
   const now = new Date();
@@ -178,12 +185,15 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
            if (isCleanedUp.current) return;
            console.log(`Realtime 系统事件: ${event}`);
         });
-        newChannel.on('presence', { event: 'sync' }, (data: PresenceData) => {
+        
+        // 修改 presence sync 事件处理，使用更具体的类型
+        newChannel.on('presence', { event: 'sync' }, () => {
            if (isCleanedUp.current) return;
            console.log('Presence 同步');
            // const presenceState = channelRef.current?.presenceState(); // Access via ref
            // console.log('当前 Presence 状态:', presenceState);
         });
+        
         newChannel.on('presence', { event: 'join' }, (data: PresenceData) => {
            if (isCleanedUp.current) return;
           console.log(`用户加入: ${data.key}`, data.newPresences);
