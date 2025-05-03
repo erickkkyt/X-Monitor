@@ -479,6 +479,30 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
           )}
         </div>
       </div>
+
+      {/* 电话号码绑定提示框 - 增加上边距 */}
+      <div className="mt-8 bg-[#0d1117] rounded-lg p-4 border border-gray-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-start flex-1">
+            <div className="flex-shrink-0 mt-1">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-amber-300">提示信息</h3>
+              <div className="mt-2 text-sm text-gray-300">
+                <p>为了确保您能及时获取监控账号的最新动态，建议绑定您的手机号码。系统将在监控账号发布新内容时，通过电话通知您第一时间了解最新信息。</p>
+              </div>
+            </div>
+          </div>
+          <div className="ml-4 flex-shrink-0">
+            <a href="/dashboard/notifications" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-amber-400 hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
+              前往通知设置
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
-} 
+}

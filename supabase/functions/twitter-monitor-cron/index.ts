@@ -1,80 +1,153 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { TwitterApi } from 'npm:twitter-api-v2@1.16.0'; // Use npm specifier for Deno
-// Correctly import the Tencent Cloud SDK for Deno/ESM
-import * as tencentcloud from 'npm:tencentcloud-sdk-nodejs-ccc';
-import { makeTwitterCall, logCallToDatabase } from './twilio-helper.ts';
-// Access the specific client constructor
-const CccClient = tencentcloud.ccc.v20200210.Client;
+// Import Aliyun SDKs
+import Dyvmsapi20170525, * as $Dyvmsapi20170525 from '@alicloud/dyvmsapi20170525';
+import * as $OpenApi from '@alicloud/openapi-client';
+import * as $Util from '@alicloud/tea-util';
+import Credential from '@alicloud/credentials';
+
+import { makeTwitterCall, logCallToDatabase } from './twilio-helper.ts'; // <-- TWILIO HELPER!
+
 console.log('Initializing Twitter Monitor Cron Function...');
-// --- Tencent Cloud Helper Function ---
-async function makeTencentCloudCall(params) {
+
+// --- Aliyun Helper Function ---
+async function createAliyunClient(): Promise<$Dyvmsapi20170525.default> {
+  // 1. 创建 Credential 对象
+  console.log("尝试创建阿里云凭证对象 (从环境变量)...");
+  const credential = new Credential.default(); // 保持这个成功的修改
+  console.log("阿里云凭证对象已创建。");
+
+  // 2. 创建 Config 对象
+  console.log("正在创建 OpenApi 配置对象...");
+  const config = new $OpenApi.Config({
+    credential: credential, 
+  });
+  console.log("OpenApi 配置对象已创建。"); // 修正日志文本
+
+  // 3. 设置 Endpoint
+  config.endpoint = `dyvmsapi.aliyuncs.com`;
+  console.log("OpenApi 配置已设置 Endpoint:", config.endpoint); // 修正日志文本
+
+  // 4. 创建并返回客户端实例 (应用 .default 修正)
+  console.log("正在创建 Dyvmsapi 客户端实例 (应用 .default)...");
+  return new Dyvmsapi20170525.default(config); // <--- 应用 .default 修正
+}
+
+interface SendTtsNotificationParams {
+  phoneNumber: string;
+  templateId: string; // TtsCode
+  templateParams?: Record<string, string>; // 例如 { name: '张三', item: 'CPU使用率', value: '95%' }
+  calledShowNumber?: string; // 专属模式下需要提供
+  outId?: string; // 可选的自定义ID
+}
+
+async function sendAliyunTtsNotification(params: SendTtsNotificationParams) {
+   if (!params.phoneNumber || !params.templateId) {
+     console.error('缺少必要的参数: 手机号或模板ID');
+     return { success: false, error: '缺少必要的参数: 手机号或模板ID' }; // Return error object
+   }
+
   try {
-    const client = new CccClient({
-      credential: {
-        secretId: params.secretId,
-        secretKey: params.secretKey
-      },
-      region: 'ap-guangzhou',
-      profile: {
-        httpProfile: {
-          endpoint: 'ccc.tencentcloudapi.com'
-        }
-      }
+    // 1. 创建 Aliyun 客户端 (使用我们之前的辅助函数)
+    const client = await createAliyunClient();
+
+    // --- 新增：处理手机号格式 ---
+    let formattedPhoneNumber = params.phoneNumber;
+    if (formattedPhoneNumber.startsWith('+86')) {
+      formattedPhoneNumber = formattedPhoneNumber.substring(3); // 去掉前3位 '+86'
+      console.log(`[Aliyun TTS] 移除了+86前缀，格式化号码为: ${formattedPhoneNumber}`);
+    } else if (formattedPhoneNumber.startsWith('86')) {
+        formattedPhoneNumber = formattedPhoneNumber.substring(2); // 去掉前2位 '86'
+        console.log(`[Aliyun TTS] 移除了86前缀，格式化号码为: ${formattedPhoneNumber}`);
+    }
+    // --- 结束处理 ---
+
+    // 2. 构造请求对象 (使用格式化后的号码)
+    const singleCallByTtsRequest = new $Dyvmsapi20170525.SingleCallByTtsRequest({ // 使用命名空间中的 Request 类型
+      // 必填参数
+      calledNumber: formattedPhoneNumber, // <--- 使用处理后的号码
+      ttsCode: params.templateId,
+      // 可选参数
+      ttsParam: params.templateParams ? JSON.stringify(params.templateParams) : undefined, // 确保这个对象匹配你的模板变量
+      calledShowNumber: params.calledShowNumber, // 公共模式不填或 undefined
+      outId: params.outId, // 自定义ID
+      playTimes: 3,   // 可选：播放次数，参照示例默认为 3
+      volume: 100,  // 可选：音量，参照示例默认为 100
+      speed: 5,     // 可选：语速，参照示例默认为 5
     });
-    const apiParams = {
-      SdkAppId: params.sdkAppId,
-      NotBefore: Math.floor(Date.now() / 1000),
-      Callees: [
-        params.to
-      ],
-      Callers: [
-        params.callerNumber
-      ],
-      IvrId: params.ivrId,
-      Name: `Twitter通知-${params.accountName}-${params.userId}-${Date.now()}`,
-      Variables: [
-        {
-          Key: 'tweetContent',
-          Value: `您好，您关注的账号 ${params.accountName} 有新动态：${params.content}` // Prepend context
-        }
-      ],
-      Tries: 1,
-      TimeZone: 'Asia/Shanghai'
-    };
-    console.log(`Making Tencent Cloud call to ${params.to} with IvrId ${params.ivrId}`);
-    const result = await client.CreateAutoCalloutTask(apiParams);
-    console.log(`Tencent Cloud call initiated. Task ID: ${result.TaskId}`);
-    return result.TaskId;
-  } catch (error) {
-    console.error(`Error making Tencent Cloud call to ${params.to}:`, error);
-    return null;
+
+    // 3. 准备 Runtime Options (参照官方示例)
+    const runtime = new $Util.RuntimeOptions({}); // 通常不需要特殊配置
+
+    console.log(`[Aliyun TTS] 准备呼叫 ${formattedPhoneNumber} 使用模板 ${params.templateId} 参数: ${singleCallByTtsRequest.ttsParam || '{}'}`);
+
+    // 4. 发起 API 调用 (参照官方示例)
+    const response = await client.singleCallByTtsWithOptions(singleCallByTtsRequest, runtime);
+
+    console.log('[Aliyun TTS] API 响应:', JSON.stringify(response.body)); // Log entire response body
+
+    // 5. 处理响应
+    if (response.body?.code === 'OK') {
+      console.log(`[Aliyun TTS] 呼叫请求成功，CallId: ${response.body.callId}`);
+      return { success: true, callId: response.body.callId };
+    } else {
+      const errorCode = response.body?.code || 'Unknown Code';
+      const errorMessage = response.body?.message || 'Unknown Message';
+      console.error(`[Aliyun TTS] 呼叫请求失败: Code=${errorCode}, Message=${errorMessage}`);
+      return { success: false, error: `阿里云语音通知失败: ${errorMessage} (${errorCode})`, errorCode: errorCode };
+    }
+
+  } catch (error: any) {
+    // 6. 处理异常 (参照官方示例改进)
+    console.error('[Aliyun TTS] 调用异常:', error.message);
+    let errorMessage = error.message || '未知错误';
+    let errorCode = error.code; // SDK 异常可能有 code
+    // 尝试获取更详细的错误信息或建议 (参照官方示例)
+    if (error.data?.Recommend) {
+         console.error('[Aliyun TTS] 阿里云建议:', error.data.Recommend);
+         // 可以考虑将 Recommend 信息也加入返回的 error 中
+    }
+    if (error.data?.Message) { // 使用 SDK error data 中的 Message
+         errorMessage = `${error.data.Message} (${errorMessage})`; // 组合消息
+    }
+     if (error.data?.Code) { // 使用 SDK error data 中的 Code
+         errorCode = error.data.Code;
+     }
+
+    return { success: false, error: `调用阿里云语音服务异常: ${errorMessage}`, errorCode: errorCode };
   }
 }
-// ---------------------------------
-// Rename req to _req as it's unused and disable the eslint warning for this specific case
+// --- End Aliyun Helper ---
+
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 serve(async (_req)=>{
   console.log('Cron function invoked.');
   const invocationTime = new Date(); // Record invocation time
+
   try {
     // 1. Initialize Clients using Environment Variables (Secrets)
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const twitterBearerToken = Deno.env.get('TWITTER_BEARER_TOKEN');
+
     // Twilio 环境变量
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
-    // Tencent Cloud 环境变量
-    const tencentSecretId = Deno.env.get('TENCENT_SECRET_ID');
-    const tencentSecretKey = Deno.env.get('TENCENT_SECRET_KEY');
-    const tencentSdkAppIdStr = Deno.env.get('TENCENT_SDKAPPID');
-    const tencentCallerNumber = Deno.env.get('TENCENT_CALLER_NUMBER');
-    const tencentIvrIdStr = Deno.env.get('TENCENT_IVR_ID');
+
+    // Aliyun 环境变量
+    const aliyunAccessKeyId = Deno.env.get('ALIYUN_ACCESS_KEY_ID');
+    const aliyunAccessKeySecret = Deno.env.get('ALIYUN_ACCESS_KEY_SECRET');
+    const aliyunTtsTemplateId = Deno.env.get('ALIYUN_TTS_TEMPLATE_ID');
+    // 可选：如果使用专属号码，则需要配置
+    // const aliyunCalledShowNumber = Deno.env.get('ALIYUN_CALLED_SHOW_NUMBER');
+
     if (!supabaseUrl || !supabaseServiceKey || !twitterBearerToken) {
       throw new Error('Missing environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or TWITTER_BEARER_TOKEN');
     }
+
     // 检查Twilio环境变量
     const isTwilioEnabled = !!(twilioAccountSid && twilioAuthToken && twilioPhoneNumber);
     if (!isTwilioEnabled) {
@@ -82,21 +155,16 @@ serve(async (_req)=>{
     } else {
       console.log('Twilio配置已加载，国际电话通知功能已启用');
     }
-    // 检查Tencent Cloud环境变量
-    const isTencentCloudEnabled = !!(tencentSecretId && tencentSecretKey && tencentSdkAppIdStr && tencentCallerNumber && tencentIvrIdStr);
-    let tencentSdkAppId = null;
-    let tencentIvrId = null;
-    if (!isTencentCloudEnabled) {
-      console.warn('Tencent Cloud环境变量未完全配置，中国大陆电话通知功能将被禁用');
+
+    // 检查Aliyun环境变量
+    const isAliyunEnabled = !!(aliyunAccessKeyId && aliyunAccessKeySecret && aliyunTtsTemplateId);
+    if (!isAliyunEnabled) {
+      console.warn('Aliyun环境变量未完全配置 (需要 ID, Secret, TemplateID)，中国大陆电话通知功能将被禁用');
     } else {
-      tencentSdkAppId = parseInt(tencentSdkAppIdStr, 10);
-      tencentIvrId = parseInt(tencentIvrIdStr, 10);
-      if (isNaN(tencentSdkAppId) || isNaN(tencentIvrId)) {
-        console.error('TENCENT_SDKAPPID 或 TENCENT_IVR_ID 环境变量不是有效的数字');
-        throw new Error('Invalid Tencent Cloud numeric environment variable.');
-      }
-      console.log('Tencent Cloud配置已加载，中国大陆电话通知功能已启用');
+      console.log('Aliyun配置已加载，中国大陆电话通知功能已启用');
     }
+
+
     // Use Service Role Key for admin-level access
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -105,6 +173,7 @@ serve(async (_req)=>{
       }
     });
     console.log('Supabase client initialized.');
+
     // --- Frequency Check Logic ---
     console.log('Fetching monitoring settings...');
     const { data: settingsData, error: settingsError } = await supabase.from('monitoring_settings').select('*').eq('id', 1) // Assuming global settings are stored with id = 1
@@ -146,11 +215,13 @@ serve(async (_req)=>{
     }
     console.log('Proceeding with Twitter check...');
     // --- End Frequency Check Logic ---
+
     // Use App-only authentication (Bearer Token)
     const twitterClient = new TwitterApi(twitterBearerToken);
     const twitterApi = twitterClient.readOnly.v2 // Use v2 API endpoints
     ;
     console.log('Twitter client initialized.');
+
     // 2. Fetch all monitored accounts from the database
     const { data: accounts, error: fetchAccountsError } = await supabase.from('monitored_accounts').select('*, user_id'); // Ensure user_id is selected
     if (fetchAccountsError) {
@@ -169,6 +240,7 @@ serve(async (_req)=>{
     }
     console.log(`Found ${accounts.length} accounts to monitor.`);
     let totalNewTweets = 0;
+
     // 3. Loop through each account and fetch new tweets
     for (const account of accounts){
       const initialLastTweetId = account.last_tweet_id;
@@ -263,8 +335,8 @@ serve(async (_req)=>{
                 console.log(`Skipping Realtime notification for ${account.username}: Not an incremental update.`);
               }
               // --- End Realtime Notification Logic ---
-              // --- Phone Notification Logic (Twilio & Tencent Cloud) ---
-              if ((isTwilioEnabled || isTencentCloudEnabled) && wasIncrementalUpdate && account.user_id) {
+              // --- Phone Notification Logic (Twilio) ---
+              if (isTwilioEnabled && wasIncrementalUpdate && account.user_id) {
                 console.log(`检查账号 @${account.username} 的新推文是否需要电话通知...`);
                 // 1. Fetch users who need phone notifications
                 const { data: usersForCalls, error: usersFetchError } = await supabase.from('user_preferences').select('user_id, phone_number') // Select user_id as well
@@ -291,24 +363,32 @@ serve(async (_req)=>{
                     let callIdentifier = null;
                     // Check if it's a China number
                     const isChinaNumber = userPhoneNumber.startsWith('+86') || userPhoneNumber.startsWith('86');
-                    if (isChinaNumber && isTencentCloudEnabled && tencentSdkAppId && tencentIvrId) {
-                      // --- Make Tencent Cloud Call ---
-                      console.log(`Routing call for ${userPhoneNumber} (China) via Tencent Cloud.`);
-                      callProvider = 'tencent';
+                    if (isChinaNumber) {
+                      // --- Make Aliyun Call ---
+                      console.log(`Routing call for ${userPhoneNumber} (China) via Aliyun TTS.`);
+                      callProvider = 'aliyun';
                       try {
-                        callIdentifier = await makeTencentCloudCall({
-                          to: userPhoneNumber,
-                          content: tweetForNotification,
-                          accountName: account.username,
-                          sdkAppId: tencentSdkAppId,
-                          secretId: tencentSecretId,
-                          secretKey: tencentSecretKey,
-                          callerNumber: tencentCallerNumber,
-                          ivrId: tencentIvrId,
-                          userId: targetUserId // Pass user ID for naming/logging
+                        // Prepare template parameters matching the Aliyun template
+                        const templateParams = {
+                          account: account.username, // Match template variable ${account}
+                          content: tweetForNotification // Match template variable ${content}
+                        };
+
+                        const callResult = await sendAliyunTtsNotification({
+                          phoneNumber: userPhoneNumber,
+                          templateId: aliyunTtsTemplateId,
+                          templateParams: templateParams,
+                          // calledShowNumber: aliyunCalledShowNumber, // Uncomment if using exclusive number
+                          outId: `twitter-${targetUserId}-${account.id}` // Example custom ID
                         });
-                      } catch (tencentError) {
-                        console.error(`Tencent Cloud call failed for ${userPhoneNumber}:`, tencentError);
+                        
+                        callIdentifier = callResult.success ? callResult.callId : null;
+                        
+                        if (!callResult.success) {
+                          console.error(`Aliyun call failed for ${userPhoneNumber}:`, callResult.error);
+                        }
+                      } catch (aliyunError) {
+                        console.error(`Aliyun call exception for ${userPhoneNumber}:`, aliyunError);
                         callIdentifier = null; // Ensure identifier is null on error
                       }
                     } else if (!isChinaNumber && isTwilioEnabled) {
@@ -364,12 +444,11 @@ serve(async (_req)=>{
                 }
               } else if (!wasIncrementalUpdate) {
                 console.log(`Skipping phone notification for @${account.username}: Not an incremental update or insert failed.`);
-              } else if (!isTwilioEnabled && !isTencentCloudEnabled) {
+              } else if (!isTwilioEnabled) {
                 console.log(`Skipping phone notification for @${account.username}: No call providers enabled.`);
               } else if (!account.user_id) {
                 console.warn(`Cannot determine users for phone notification for @${account.username}: missing account.user_id.`);
               }
-            // --- End Phone Notification Logic ---
             }
           }
         } else {

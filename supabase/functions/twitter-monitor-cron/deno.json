@@ -1,6 +1,10 @@
 {
   "imports": {
     "twitter-api-v2": "npm:twitter-api-v2@1.16.0",
-    "tencentcloud-sdk-nodejs-ccc": "npm:tencentcloud-sdk-nodejs-ccc@4.0.814"
+    "@alicloud/dyvmsapi20170525": "npm:@alicloud/dyvmsapi20170525@2.3.2",
+    "@alicloud/openapi-client": "npm:@alicloud/openapi-client",
+    "@alicloud/tea-util": "npm:@alicloud/tea-util",
+    "@alicloud/credentials": "npm:@alicloud/credentials",
+    "@alicloud/tea-typescript": "npm:@alicloud/tea-typescript"
   }
 }

@@ -67,6 +67,8 @@ export default async function Dashboard() {
       <main className="p-6">
         {/* Render the client component, passing initial data */}
         <DashboardClient initialAccounts={accounts} initialFetchError={fetchError} />
+        
+        {/* 电话号码绑定提示框 - 已移至DashboardClient组件中 */}
       </main>
     </div>
   );
