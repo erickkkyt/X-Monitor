@@ -83,15 +83,6 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const dailyClearTimerRef = useRef<NodeJS.Timeout | null>(null); // 用于存储每日清除定时器
 
-  const todayStart = useMemo(() => getStartOfToday(), []); // 仅在挂载时计算一次
-
-  // 筛选出今天的通知
-  const todayNotifications = useMemo(() => {
-    return allReceivedNotifications
-      .filter(n => n.timestamp >= todayStart)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // 按时间降序排列
-  }, [allReceivedNotifications, todayStart]);
-
   // --- 每日自动清除通知逻辑 ---
   useEffect(() => {
     const scheduleDailyClear = () => {
@@ -264,15 +255,15 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
     };
   }, [supabase, monitoredAccounts]);
 
-  // --- 计算用于展示的通知 ---
-  const latestThreeTodayNotifications = useMemo(() => {
-    const startOfToday = getStartOfToday();
+  // --- 计算今日通知 ---
+  const startOfToday = useMemo(() => getStartOfToday(), []);
+  const todayNotifications = useMemo(() => {
     return allReceivedNotifications
-      .filter(notification => notification.timestamp >= startOfToday) // 1. 筛选今天
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()) // 2. 按时间倒序
-      .slice(0, 3); // 3. 取最新的 3 条
-  }, [allReceivedNotifications]); // 当所有通知列表变化时重新计算
+      .filter(n => n.timestamp >= startOfToday)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // 按时间降序
+  }, [allReceivedNotifications, startOfToday]);
 
+  // --- 添加账号处理 ---
   const handleAddAccount = async () => {
     if (!newAccount.trim()) {
       setAddAccountError('请输入推特用户名。');
@@ -333,7 +324,7 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
     }
   };
 
-  // Helper function to format date/time
+  // --- 时间格式化 ---
   const formatTimeAgo = (date: Date): string => {
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -355,172 +346,132 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
     return `${Math.floor(seconds)} 秒前`;
   };
 
-  // 处理删除账号
-  const handleDeleteAccount = async (accountId: string) => {
-    // 可选：添加确认对话框
-    if (!confirm('确定要删除这个监控账号吗？相关的通知历史不会被删除。')) {
-      return;
-    }
-
-    // TODO: 添加删除时的加载状态
-    console.log(`尝试删除账号: ${accountId}`);
-
-    try {
-      const response = await fetch('/api/monitored-accounts', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ accountId }),
-      });
-
-      const result: ApiResponse = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || '删除失败，请重试。');
-      }
-
-      console.log('账号删除成功');
-      // 从前端状态中移除账号
-      setMonitoredAccounts(prev => prev.filter(acc => acc.id !== accountId));
-      // 可选：显示成功消息
-
-    } catch (error: unknown) {
-      console.error('删除账号时出错:', error);
-      // 显示错误消息给用户
-      alert('删除账号失败: ' + (error instanceof Error ? error.message : '未知错误'));
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      {/* 1. 添加新账号部分 */}
-      <div className="bg-[#1a1f26] p-6 rounded-lg shadow-md">
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-4 sm:p-6 lg:p-8">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">仪表盘</h1>
+
+      {/* 添加新监控账号表单 */}
+      <div className="bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
         <h2 className="text-xl font-semibold mb-4">添加新的监控账号</h2>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             value={newAccount}
-            onChange={(e) => setNewAccount(e.target.value.trim())}
+            onChange={(e) => setNewAccount(e.target.value)}
             placeholder="输入推特用户名... (例如: elonmusk)"
-            className="flex-grow bg-[#2b3139] border border-[#444c56] rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={isAddingAccount}
+            className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-sm sm:text-base"
           />
           <button
             onClick={handleAddAccount}
-            disabled={isAddingAccount || !newAccount}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-semibold px-6 py-2 rounded-md transition duration-150 ease-in-out"
+            disabled={isAddingAccount || !newAccount.trim()}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {isAddingAccount ? '添加中...' : '添加'}
           </button>
         </div>
-        {addAccountError && <p className="text-red-400 mt-3 text-sm">{addAccountError}</p>}
-        {addAccountSuccess && <p className="text-green-400 mt-3 text-sm">{addAccountSuccess}</p>}
+        {addAccountError && <p className="text-red-400 text-sm mt-2">{addAccountError}</p>}
+        {addAccountSuccess && <p className="text-green-400 text-sm mt-2">{addAccountSuccess}</p>}
       </div>
 
-      {/* *** 提示信息框的新位置 *** */}
-      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 p-4 rounded-md shadow flex items-center justify-between" role="alert">
-        <div className="flex items-center">
-          <svg className="w-5 h-5 mr-2 text-yellow-700" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path></svg>
-          <p>
-            <span className="font-medium">提示信息：</span> 为了确保您能及时获取监控账号的最新动态，建议绑定您的手机号码。系统将在监控账号发布新内容时，通过电话语音通知您第一时间了解最新信息。
-          </p>
+      {/* 恢复并放置原始的提示信息框 */}
+      <div className="mt-8 bg-[#0d1117] rounded-lg p-4 border border-gray-800 mb-6 sm:mb-8"> {/* 使用原始样式并添加下边距 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-start flex-1">
+            <div className="flex-shrink-0 mt-1">
+              {/* Original SVG Icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-amber-300">提示信息</h3>
+              <div className="mt-2 text-sm text-gray-300">
+                <p>为了确保您能及时获取监控账号的最新动态，建议绑定您的手机号码。系统将在监控账号发布新内容时，通过电话通知您第一时间了解最新信息。</p>
+              </div>
+            </div>
+          </div>
+          <div className="ml-4 flex-shrink-0">
+            {/* Original Link Button */}
+            <a href="/dashboard/notifications" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-amber-400 hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
+              前往通知设置
+            </a>
+          </div>
         </div>
-         <button
-            // TODO: Implement navigation to settings page
-            onClick={() => alert('跳转到通知设置页面（待实现）')}
-            className="ml-4 flex-shrink-0 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded text-sm transition duration-150 ease-in-out"
-         >
-            前往通知设置
-          </button>
       </div>
 
-      {/* 2. 监控账号和今日通知卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 监控账号卡片 */}
-        <div className="bg-[#1a1f26] p-6 rounded-lg shadow-md min-h-[200px]"> {/* 添加最小高度 */}
+      {/* 监控账号和今日通知网格 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+        {/* 监控账号列表 */}
+        <div className="bg-gray-800 rounded-lg shadow-md p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-4">监控账号 ({monitoredAccounts.length})</h2>
-          {accountsError && <p className="text-red-400 text-sm">{accountsError}</p>}
-          {monitoredAccounts.length > 0 ? (
+          {accountsError && <p className="text-red-400 mb-4">加载监控账号失败: {accountsError}</p>}
+          {isLoading && <p>加载中...</p>} {/* Display loading state */}
+          {!isLoading && !accountsError && monitoredAccounts.length === 0 && (
+            <p className="text-gray-400">暂无监控账号，请在上方添加。</p>
+          )}
+          {!isLoading && monitoredAccounts.length > 0 && (
             <ul className="space-y-3">
               {monitoredAccounts.map((account) => (
-                <li key={account.id} className="flex items-center justify-between bg-[#2b3139] p-3 rounded-md">
+                <li key={account.id} className="flex items-center justify-between bg-gray-700 p-3 rounded-md">
                   <div className="flex items-center space-x-3">
-                    {account.profile_image_url ? (
-                       <Image
-                        src={account.profile_image_url}
-                        alt={`${account.display_name}'s profile picture`}
-                        width={40}
-                        height={40}
-                        className="rounded-full"
-                      />
-                     ) : (
-                       <div className="w-10 h-10 rounded-full bg-gray-500 flex items-center justify-center text-white font-bold">
-                         {account.display_name?.[0] || account.username[0]}
-                       </div>
-                     )
-                    }
+                    <Image
+                      src={account.profile_image_url || '/default-avatar.png'} // Provide a default avatar
+                      alt={`${account.display_name} avatar`}
+                      width={40}
+                      height={40}
+                      className="rounded-full"
+                      unoptimized // If profile URLs are external and not optimized by Next/Image
+                    />
                     <div>
-                      <p className="font-medium text-white">{account.display_name}</p>
-                      <p className="text-sm text-gray-400">@{account.username}</p>
+                      <p className="font-medium text-sm sm:text-base">{account.display_name}</p>
+                      <p className="text-xs text-gray-400">@{account.username}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteAccount(account.id)}
-                    // TODO: Add loading state for delete button
-                    className="text-red-400 hover:text-red-300 text-xs"
-                  >
-                    删除
-                  </button>
+                  {/* Optional: Add remove button or other actions here */}
+                  {/* <button className="text-red-400 hover:text-red-300 text-xs">移除</button> */}
                 </li>
               ))}
             </ul>
-          ) : (
-             !accountsError && <p className="text-gray-400">暂无监控账号，请在上方添加。</p>
           )}
         </div>
 
-        {/* 今日通知卡片 */}
-        <div className="bg-[#1a1f26] p-6 rounded-lg shadow-md min-h-[200px]"> {/* 添加最小高度 */}
+        {/* 今日通知 */}
+        <div className="bg-gray-800 rounded-lg shadow-md p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-4">今日通知</h2>
-           {isLoading ? (
-            <div className="flex justify-center items-center h-full text-gray-400">加载通知中...</div>
-          ) : todayNotifications.length > 0 ? (
-            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2"> {/* 添加最大高度和滚动 */}
+          {todayNotifications.length === 0 ? (
+            <div className="text-center text-gray-400 py-10">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+              </svg>
+              <p className="text-sm">今日暂无通知</p>
+              <p className="text-xs mt-1">有新通知时将在此处显示</p>
+            </div>
+          ) : (
+            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2"> {/* Add scroll for long lists */}
               {todayNotifications.map((notification) => (
-                <li key={notification.id} className="bg-[#2b3139] p-3 rounded-md">
-                  <div className="flex items-start space-x-3">
-                     {notification.profileImageUrl ? (
-                       <Image
-                        src={notification.profileImageUrl}
-                        alt={`${notification.accountDisplayName}'s profile picture`}
-                        width={32}
+                <li key={notification.id} className={`border-l-4 ${notification.isImportant ? 'border-red-500' : 'border-blue-500'} bg-gray-700 p-3 rounded-r-md`}>
+                   <div className="flex items-start space-x-3">
+                      <Image
+                        src={notification.profileImageUrl || '/default-avatar.png'}
+                        alt={`${notification.accountDisplayName} avatar`}
+                        width={32} // Smaller avatar for notifications
                         height={32}
                         className="rounded-full mt-1"
+                        unoptimized
                       />
-                     ) : (
-                       <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white font-bold flex-shrink-0 mt-1">
-                         {notification.accountDisplayName?.[0] || notification.accountUsername[0]}
-                       </div>
-                     )
-                     }
-                    <div className="flex-1">
-                      <div className="flex justify-between items-baseline">
-                        <p className="font-medium text-white text-sm">{notification.accountDisplayName || notification.accountUsername}</p>
-                        <p className="text-xs text-gray-400">{formatTimeAgo(notification.timestamp)}</p>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                           <span className="font-medium text-sm">{notification.accountDisplayName || notification.accountUsername}</span>
+                          <span className="text-xs text-gray-400">{formatTimeAgo(notification.timestamp)}</span>
+                         </div>
+                        <p className="text-sm text-gray-200 whitespace-pre-wrap">{notification.content}</p>
                       </div>
-                      <p className="text-sm text-gray-300 mt-1">{notification.content}</p>
                     </div>
-                  </div>
                 </li>
               ))}
             </ul>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                <p>今日暂无通知</p>
-                <p className="text-xs mt-1">有新通知时将在此处显示</p>
-            </div>
           )}
         </div>
       </div>
