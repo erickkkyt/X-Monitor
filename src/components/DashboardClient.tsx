@@ -83,6 +83,15 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const dailyClearTimerRef = useRef<NodeJS.Timeout | null>(null); // 用于存储每日清除定时器
 
+  const todayStart = useMemo(() => getStartOfToday(), []); // 仅在挂载时计算一次
+
+  // 筛选出今天的通知
+  const todayNotifications = useMemo(() => {
+    return allReceivedNotifications
+      .filter(n => n.timestamp >= todayStart)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // 按时间降序排列
+  }, [allReceivedNotifications, todayStart]);
+
   // --- 每日自动清除通知逻辑 ---
   useEffect(() => {
     const scheduleDailyClear = () => {
@@ -346,161 +355,173 @@ export default function DashboardClient({ initialAccounts, initialFetchError }: 
     return `${Math.floor(seconds)} 秒前`;
   };
 
+  // 处理删除账号
+  const handleDeleteAccount = async (accountId: string) => {
+    // 可选：添加确认对话框
+    if (!confirm('确定要删除这个监控账号吗？相关的通知历史不会被删除。')) {
+      return;
+    }
+
+    // TODO: 添加删除时的加载状态
+    console.log(`尝试删除账号: ${accountId}`);
+
+    try {
+      const response = await fetch('/api/monitored-accounts', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accountId }),
+      });
+
+      const result: ApiResponse = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || '删除失败，请重试。');
+      }
+
+      console.log('账号删除成功');
+      // 从前端状态中移除账号
+      setMonitoredAccounts(prev => prev.filter(acc => acc.id !== accountId));
+      // 可选：显示成功消息
+
+    } catch (error: unknown) {
+      console.error('删除账号时出错:', error);
+      // 显示错误消息给用户
+      alert('删除账号失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#010409] text-gray-300 p-4 sm:p-6 lg:p-8">
-      {/* 添加推特账号 Section */}
-      <div className="mb-8 p-6 bg-[#0d1117] rounded-lg shadow-md border border-gray-800">
-        <h2 className="text-xl font-semibold text-white mb-4">添加新的监控账号</h2>
-        <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+    <div className="space-y-6">
+      {/* 1. 添加新账号部分 */}
+      <div className="bg-[#1a1f26] p-6 rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold mb-4">添加新的监控账号</h2>
+        <div className="flex items-center space-x-3">
           <input
             type="text"
             value={newAccount}
-            onChange={(e) => setNewAccount(e.target.value)}
+            onChange={(e) => setNewAccount(e.target.value.trim())}
             placeholder="输入推特用户名... (例如: elonmusk)"
-            className="flex-grow px-4 py-2 bg-[#161b22] border border-gray-700 rounded-md text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-grow bg-[#2b3139] border border-[#444c56] rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={isAddingAccount}
           />
           <button
             onClick={handleAddAccount}
-            disabled={isAddingAccount || !newAccount.trim()}
-            className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#010409] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={isAddingAccount || !newAccount}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-semibold px-6 py-2 rounded-md transition duration-150 ease-in-out"
           >
             {isAddingAccount ? '添加中...' : '添加'}
           </button>
         </div>
-        {addAccountError && <p className="mt-3 text-sm text-red-500">{addAccountError}</p>}
-        {addAccountSuccess && <p className="mt-3 text-sm text-green-500">{addAccountSuccess}</p>}
+        {addAccountError && <p className="text-red-400 mt-3 text-sm">{addAccountError}</p>}
+        {addAccountSuccess && <p className="text-green-400 mt-3 text-sm">{addAccountSuccess}</p>}
       </div>
 
-      {/* 分为两列的布局：监控账号列表和今日通知 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* 监控账号列表 Section - 宽度减半 */}
-        <div className="bg-[#0d1117] rounded-lg shadow-md p-6 border border-gray-800">
-          <h2 className="text-xl font-semibold text-white mb-5">监控账号 ({monitoredAccounts.length})</h2>
-          {accountsError && <p className="text-red-500 mb-4">{accountsError}</p>}
+      {/* *** 提示信息框的新位置 *** */}
+      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 p-4 rounded-md shadow flex items-center justify-between" role="alert">
+        <div className="flex items-center">
+          <svg className="w-5 h-5 mr-2 text-yellow-700" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path></svg>
+          <p>
+            <span className="font-medium">提示信息：</span> 为了确保您能及时获取监控账号的最新动态，建议绑定您的手机号码。系统将在监控账号发布新内容时，通过电话语音通知您第一时间了解最新信息。
+          </p>
+        </div>
+         <button
+            // TODO: Implement navigation to settings page
+            onClick={() => alert('跳转到通知设置页面（待实现）')}
+            className="ml-4 flex-shrink-0 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded text-sm transition duration-150 ease-in-out"
+         >
+            前往通知设置
+          </button>
+      </div>
 
-          {monitoredAccounts.length === 0 && !accountsError && (
-            <p className="text-gray-500 italic">暂无监控账号，请在上方添加。</p>
-          )}
-
-          {monitoredAccounts.length > 0 && (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2"> {/* 添加滚动 */}
+      {/* 2. 监控账号和今日通知卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 监控账号卡片 */}
+        <div className="bg-[#1a1f26] p-6 rounded-lg shadow-md min-h-[200px]"> {/* 添加最小高度 */}
+          <h2 className="text-xl font-semibold mb-4">监控账号 ({monitoredAccounts.length})</h2>
+          {accountsError && <p className="text-red-400 text-sm">{accountsError}</p>}
+          {monitoredAccounts.length > 0 ? (
+            <ul className="space-y-3">
               {monitoredAccounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between p-3 bg-[#161b22] rounded-md space-x-3 hover:bg-[#22272e] transition-colors duration-150">
-                  <div className="flex items-center space-x-3 flex-shrink min-w-0"> {/* Added min-w-0 for truncation */}
+                <li key={account.id} className="flex items-center justify-between bg-[#2b3139] p-3 rounded-md">
+                  <div className="flex items-center space-x-3">
                     {account.profile_image_url ? (
-                      <Image
+                       <Image
                         src={account.profile_image_url}
-                        alt={`${account.username} profile picture`}
-                        width={40} // Slightly larger image
+                        alt={`${account.display_name}'s profile picture`}
+                        width={40}
                         height={40}
-                        className="rounded-full flex-shrink-0" // Prevent image shrinking
+                        className="rounded-full"
                       />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm font-medium flex-shrink-0">
-                        {account.username.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0"> {/* Added min-w-0 for truncation */}
-                      <p className="font-medium text-white truncate">{account.display_name}</p> {/* Added truncate */}
-                      <p className="text-xs text-gray-400 truncate">@{account.username}</p> {/* Added truncate */}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 space-y-1">
-                    <p className="text-xs text-gray-400">添加于: {new Date(account.created_at).toLocaleDateString('zh-CN')}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 今日通知 Section - 与监控账号列表宽度一致 */}
-        <div className="bg-[#0d1117] rounded-lg shadow-md p-6 border border-gray-800">
-          <div className="flex justify-between items-center mb-5">
-            <h2 className="text-xl font-semibold text-white">今日通知</h2>
-          </div>
-          
-          {/* 加载状态 */}
-          {isLoading && (
-             <div className="flex justify-center items-center h-40">
-               <p className="text-gray-500 italic">正在加载通知服务...</p>
-             </div>
-           )}
-          
-          {/* 无通知状态 */}
-          {!isLoading && accountsError && !accountsError.includes('无法设置通知服务') && !accountsError.includes('无法连接通知服务') && (
-             <div className="flex justify-center items-center h-40">
-               <p className="text-red-500 italic">{accountsError}</p>
-             </div>
-           )}
-          
-          {!isLoading && latestThreeTodayNotifications.length === 0 && !accountsError && (
-            <div className="flex flex-col items-center justify-center text-center text-gray-500 h-40">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <p>今日暂无通知</p>
-              <p className="text-xs mt-1">有新通知时将在此处显示</p>
-            </div>
-          )}
-          
-          {/* 通知列表 */}
-          {!isLoading && latestThreeTodayNotifications.length > 0 && (
-            <div className="space-y-4 max-h-96 overflow-y-auto pr-2"> {/* 添加滚动 */}
-              {latestThreeTodayNotifications.map((notification) => (
-                <div key={notification.id} className="flex items-start p-4 bg-[#161b22] rounded-md space-x-3 shadow-sm hover:bg-[#22272e] transition-colors duration-150">
-                  {notification.profileImageUrl ? (
-                    <Image
-                      src={notification.profileImageUrl}
-                      alt={`${notification.accountUsername} profile picture`}
-                      width={32}
-                      height={32}
-                      className="rounded-full mt-1 flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-medium mt-1 flex-shrink-0">
-                      {notification.accountUsername.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                       <div className="flex items-baseline space-x-2">
-                         <span className="font-semibold text-white text-sm truncate">{notification.accountDisplayName || notification.accountUsername}</span>
-                         <span className="text-xs text-gray-400 truncate hidden sm:inline">@{notification.accountUsername}</span>
+                     ) : (
+                       <div className="w-10 h-10 rounded-full bg-gray-500 flex items-center justify-center text-white font-bold">
+                         {account.display_name?.[0] || account.username[0]}
                        </div>
-                       <span className="text-xs text-gray-500 flex-shrink-0 ml-2">{formatTimeAgo(notification.timestamp)}</span>
+                     )
+                    }
+                    <div>
+                      <p className="font-medium text-white">{account.display_name}</p>
+                      <p className="text-sm text-gray-400">@{account.username}</p>
                     </div>
-                    <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">{notification.content}</p>
                   </div>
-                </div>
+                  <button
+                    onClick={() => handleDeleteAccount(account.id)}
+                    // TODO: Add loading state for delete button
+                    className="text-red-400 hover:text-red-300 text-xs"
+                  >
+                    删除
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
+          ) : (
+             !accountsError && <p className="text-gray-400">暂无监控账号，请在上方添加。</p>
           )}
         </div>
-      </div>
 
-      {/* 电话号码绑定提示框 - 增加上边距 */}
-      <div className="mt-8 bg-[#0d1117] rounded-lg p-4 border border-gray-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-start flex-1">
-            <div className="flex-shrink-0 mt-1">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
+        {/* 今日通知卡片 */}
+        <div className="bg-[#1a1f26] p-6 rounded-lg shadow-md min-h-[200px]"> {/* 添加最小高度 */}
+          <h2 className="text-xl font-semibold mb-4">今日通知</h2>
+           {isLoading ? (
+            <div className="flex justify-center items-center h-full text-gray-400">加载通知中...</div>
+          ) : todayNotifications.length > 0 ? (
+            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2"> {/* 添加最大高度和滚动 */}
+              {todayNotifications.map((notification) => (
+                <li key={notification.id} className="bg-[#2b3139] p-3 rounded-md">
+                  <div className="flex items-start space-x-3">
+                     {notification.profileImageUrl ? (
+                       <Image
+                        src={notification.profileImageUrl}
+                        alt={`${notification.accountDisplayName}'s profile picture`}
+                        width={32}
+                        height={32}
+                        className="rounded-full mt-1"
+                      />
+                     ) : (
+                       <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white font-bold flex-shrink-0 mt-1">
+                         {notification.accountDisplayName?.[0] || notification.accountUsername[0]}
+                       </div>
+                     )
+                     }
+                    <div className="flex-1">
+                      <div className="flex justify-between items-baseline">
+                        <p className="font-medium text-white text-sm">{notification.accountDisplayName || notification.accountUsername}</p>
+                        <p className="text-xs text-gray-400">{formatTimeAgo(notification.timestamp)}</p>
+                      </div>
+                      <p className="text-sm text-gray-300 mt-1">{notification.content}</p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                <p>今日暂无通知</p>
+                <p className="text-xs mt-1">有新通知时将在此处显示</p>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-amber-300">提示信息</h3>
-              <div className="mt-2 text-sm text-gray-300">
-                <p>为了确保您能及时获取监控账号的最新动态，建议绑定您的手机号码。系统将在监控账号发布新内容时，通过电话通知您第一时间了解最新信息。</p>
-              </div>
-            </div>
-          </div>
-          <div className="ml-4 flex-shrink-0">
-            <a href="/dashboard/notifications" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-amber-400 hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
-              前往通知设置
-            </a>
-          </div>
+          )}
         </div>
       </div>
     </div>
